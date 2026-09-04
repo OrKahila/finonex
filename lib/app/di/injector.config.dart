@@ -15,6 +15,7 @@ import 'dart:math' as _i407;
 
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
+import 'package:pulse_native/pulse_native.dart' as _i1048;
 
 import '../../core/app_config.dart' as _i207;
 import '../../core/clock.dart' as _i215;
@@ -32,6 +33,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i215.Clock>(() => registerModule.clock);
     gh.lazySingleton<_i407.Random>(() => registerModule.random);
     gh.lazySingleton<_i497.HttpClient>(() => registerModule.httpClient);
+    gh.lazySingleton<_i1048.PulseNativePlatform>(
+      () => registerModule.pulseNative,
+    );
     return this;
   }
 }
