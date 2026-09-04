@@ -25,6 +25,8 @@ import '../../data/feed/conflation_scheduler.dart' as _i329;
 import '../../data/feed/price_store.dart' as _i1017;
 import '../../data/feed/sse/http_sse_transport.dart' as _i314;
 import '../../data/feed/sse/sse_transport.dart' as _i929;
+import '../../data/instruments/instruments_api.dart' as _i484;
+import '../../data/instruments/instruments_repository.dart' as _i408;
 import '../../data/platform/pulse_native_network_monitor.dart' as _i110;
 import '../../data/platform/pulse_native_secure_store.dart' as _i882;
 import '../../domain/ports/network_monitor.dart' as _i231;
@@ -33,6 +35,7 @@ import '../../domain/ports/tick_sink.dart' as _i753;
 import '../../domain/reconnect_policy.dart' as _i725;
 import '../../presentation/blocs/auth/auth_bloc.dart' as _i141;
 import '../../presentation/blocs/feed/feed_connection_bloc.dart' as _i905;
+import '../../presentation/blocs/watchlist/watchlist_bloc.dart' as _i929;
 import 'register_module.dart' as _i291;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -71,16 +74,19 @@ extension GetItInjectableX on _i174.GetIt {
       () =>
           _i314.HttpSseTransport(gh<_i497.HttpClient>(), gh<_i207.AppConfig>()),
     );
-    gh.lazySingleton<_i725.ReconnectPolicy>(
-      () => _i725.ReconnectPolicy(gh<_i207.AppConfig>(), gh<_i407.Random>()),
-    );
-    gh.lazySingleton<_i753.TickSink>(
+    gh.lazySingleton<_i1017.PriceStore>(
       () => _i1017.PriceStore(
         gh<_i207.AppConfig>(),
         gh<_i215.Clock>(),
         gh<_i329.ConflationScheduler>(),
       ),
       dispose: (i) => i.dispose(),
+    );
+    gh.lazySingleton<_i725.ReconnectPolicy>(
+      () => _i725.ReconnectPolicy(gh<_i207.AppConfig>(), gh<_i407.Random>()),
+    );
+    gh.lazySingleton<_i484.InstrumentsApi>(
+      () => _i484.InstrumentsApi(gh<_i497.HttpClient>(), gh<_i207.AppConfig>()),
     );
     gh.lazySingleton<_i344.AuthRepository>(
       () => _i344.AuthRepository(
@@ -89,6 +95,18 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i215.Clock>(),
         gh<_i207.AppConfig>(),
       ),
+    );
+    gh.lazySingleton<_i753.TickSink>(
+      () => registerModule.tickSink(gh<_i1017.PriceStore>()),
+    );
+    gh.lazySingleton<_i408.InstrumentsRepository>(
+      () => _i408.InstrumentsRepository(
+        gh<_i484.InstrumentsApi>(),
+        gh<_i344.AuthRepository>(),
+      ),
+    );
+    gh.factory<_i929.WatchlistBloc>(
+      () => _i929.WatchlistBloc(gh<_i408.InstrumentsRepository>()),
     );
     gh.factory<_i905.FeedConnectionBloc>(
       () => _i905.FeedConnectionBloc(

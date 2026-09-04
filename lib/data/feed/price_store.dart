@@ -24,7 +24,7 @@ import 'tick.dart';
 ///
 /// Uses `foundation`, not `widgets`: no BuildContext, no element tree, fully
 /// testable in a plain unit test.
-@LazySingleton(as: TickSink)
+@lazySingleton
 class PriceStore implements TickSink {
   PriceStore(this._config, this._clock, this._scheduler)
       : _seenIds = _DedupWindow(_config.dedupWindow) {
