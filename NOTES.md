@@ -130,11 +130,22 @@ screen that did not recover when the feed did.
 
 ## Known limitations
 
-- I verified the rebuild structure in tests, but did not collect profile-mode
-  frame measurements on physical hardware. The simulator cannot run profile
-  mode, and the managed firewall on my Mac prevented a device from reaching the
-  local server. Debug measurements on the simulator were encouraging, but they
-  are not a substitute for device profiling.
+- Frame timing is now measured in profile mode on a physical iPhone 16 Pro Max
+  (iOS 26.6.1) against the chaotic server: 58,973 frames over ten minutes, build
+  p50 0.7ms / p95 2.2ms, raster p50 0.8ms / p95 0.9ms. Exactly one frame went
+  over 16.7ms and it was app launch; the worst after that was 5.7ms, inside the
+  8.3ms budget the device actually has at 120Hz. The recorder is
+  `lib/core/frame_report.dart` and only runs in profile builds, because DevTools'
+  chart shows a rolling window of recent frames and cannot give a p95 over the
+  whole run.
+- Those numbers only hold with the profiler detached. An earlier run showed an
+  isolated 35-46ms build frame once or twice a minute, and it was the tooling
+  rather than the app: the reconnect path does not explain it (the instrument
+  reload is guarded by `WatchlistFailed`, so an ordinary reconnect rebuilds
+  nothing), nor does allocation pressure from the per-flush map (the VM service
+  reported 1,477 collections, every one idle-reason and about a millisecond),
+  and the spikes appeared only in the run where DevTools was attached and being
+  driven.
 - The stale marker is based only on elapsed time. An instrument that naturally
   trades infrequently can be marked stale even when the connection is healthy.
 - The sparkline is based on conflated values rather than every raw tick.

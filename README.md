@@ -17,7 +17,9 @@ See **[NOTES.md](NOTES.md)** for design decisions, tradeoffs, and known gaps.
 | Native piece targets | **iOS** (Keychain + `NWPathMonitor`) |
 | Xcode | 26.x, for the iOS build |
 
-Verified on the iOS Simulator (iPhone 16 Pro, iOS 18.6).
+Verified on the iOS Simulator (iPhone 16 Pro, iOS 18.6), and in profile mode on
+a physical iPhone 16 Pro Max (iOS 26.6.1) - see NOTES.md for the frame timings
+measured there.
 
 ## Running it
 
