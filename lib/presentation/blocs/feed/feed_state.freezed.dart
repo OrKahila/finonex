@@ -17,8 +17,7 @@ mixin _$FeedState {
  ConnectionPhase get phase;/// How many consecutive reconnect attempts have been scheduled.
  int get attempt;/// When the current silence began. Drives the "no data for Ns" readout.
  DateTime? get silentSince;/// When the pending backoff timer fires. Drives the countdown.
- DateTime? get nextAttemptAt;/// Highest SSE id seen, echoed back as `Last-Event-ID` on reconnect.
- int? get lastEventId;/// How many times the server told us our resume point was too old. Each
+ DateTime? get nextAttemptAt;/// How many times the server told us our resume point was too old. Each
 /// one is a hole in history we can never fill.
  int get gapCount; String? get message;
 /// Create a copy of FeedState
@@ -31,16 +30,16 @@ $FeedStateCopyWith<FeedState> get copyWith => _$FeedStateCopyWithImpl<FeedState>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FeedState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.attempt, attempt) || other.attempt == attempt)&&(identical(other.silentSince, silentSince) || other.silentSince == silentSince)&&(identical(other.nextAttemptAt, nextAttemptAt) || other.nextAttemptAt == nextAttemptAt)&&(identical(other.lastEventId, lastEventId) || other.lastEventId == lastEventId)&&(identical(other.gapCount, gapCount) || other.gapCount == gapCount)&&(identical(other.message, message) || other.message == message));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FeedState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.attempt, attempt) || other.attempt == attempt)&&(identical(other.silentSince, silentSince) || other.silentSince == silentSince)&&(identical(other.nextAttemptAt, nextAttemptAt) || other.nextAttemptAt == nextAttemptAt)&&(identical(other.gapCount, gapCount) || other.gapCount == gapCount)&&(identical(other.message, message) || other.message == message));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,phase,attempt,silentSince,nextAttemptAt,lastEventId,gapCount,message);
+int get hashCode => Object.hash(runtimeType,phase,attempt,silentSince,nextAttemptAt,gapCount,message);
 
 @override
 String toString() {
-  return 'FeedState(phase: $phase, attempt: $attempt, silentSince: $silentSince, nextAttemptAt: $nextAttemptAt, lastEventId: $lastEventId, gapCount: $gapCount, message: $message)';
+  return 'FeedState(phase: $phase, attempt: $attempt, silentSince: $silentSince, nextAttemptAt: $nextAttemptAt, gapCount: $gapCount, message: $message)';
 }
 
 
@@ -51,7 +50,7 @@ abstract mixin class $FeedStateCopyWith<$Res>  {
   factory $FeedStateCopyWith(FeedState value, $Res Function(FeedState) _then) = _$FeedStateCopyWithImpl;
 @useResult
 $Res call({
- ConnectionPhase phase, int attempt, DateTime? silentSince, DateTime? nextAttemptAt, int? lastEventId, int gapCount, String? message
+ ConnectionPhase phase, int attempt, DateTime? silentSince, DateTime? nextAttemptAt, int gapCount, String? message
 });
 
 
@@ -68,14 +67,13 @@ class _$FeedStateCopyWithImpl<$Res>
 
 /// Create a copy of FeedState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? phase = null,Object? attempt = null,Object? silentSince = freezed,Object? nextAttemptAt = freezed,Object? lastEventId = freezed,Object? gapCount = null,Object? message = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? phase = null,Object? attempt = null,Object? silentSince = freezed,Object? nextAttemptAt = freezed,Object? gapCount = null,Object? message = freezed,}) {
   return _then(_self.copyWith(
 phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
 as ConnectionPhase,attempt: null == attempt ? _self.attempt : attempt // ignore: cast_nullable_to_non_nullable
 as int,silentSince: freezed == silentSince ? _self.silentSince : silentSince // ignore: cast_nullable_to_non_nullable
 as DateTime?,nextAttemptAt: freezed == nextAttemptAt ? _self.nextAttemptAt : nextAttemptAt // ignore: cast_nullable_to_non_nullable
-as DateTime?,lastEventId: freezed == lastEventId ? _self.lastEventId : lastEventId // ignore: cast_nullable_to_non_nullable
-as int?,gapCount: null == gapCount ? _self.gapCount : gapCount // ignore: cast_nullable_to_non_nullable
+as DateTime?,gapCount: null == gapCount ? _self.gapCount : gapCount // ignore: cast_nullable_to_non_nullable
 as int,message: freezed == message ? _self.message : message // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
@@ -162,10 +160,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( ConnectionPhase phase,  int attempt,  DateTime? silentSince,  DateTime? nextAttemptAt,  int? lastEventId,  int gapCount,  String? message)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( ConnectionPhase phase,  int attempt,  DateTime? silentSince,  DateTime? nextAttemptAt,  int gapCount,  String? message)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FeedState() when $default != null:
-return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,_that.lastEventId,_that.gapCount,_that.message);case _:
+return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,_that.gapCount,_that.message);case _:
   return orElse();
 
 }
@@ -183,10 +181,10 @@ return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( ConnectionPhase phase,  int attempt,  DateTime? silentSince,  DateTime? nextAttemptAt,  int? lastEventId,  int gapCount,  String? message)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( ConnectionPhase phase,  int attempt,  DateTime? silentSince,  DateTime? nextAttemptAt,  int gapCount,  String? message)  $default,) {final _that = this;
 switch (_that) {
 case _FeedState():
-return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,_that.lastEventId,_that.gapCount,_that.message);case _:
+return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,_that.gapCount,_that.message);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +201,10 @@ return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( ConnectionPhase phase,  int attempt,  DateTime? silentSince,  DateTime? nextAttemptAt,  int? lastEventId,  int gapCount,  String? message)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( ConnectionPhase phase,  int attempt,  DateTime? silentSince,  DateTime? nextAttemptAt,  int gapCount,  String? message)?  $default,) {final _that = this;
 switch (_that) {
 case _FeedState() when $default != null:
-return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,_that.lastEventId,_that.gapCount,_that.message);case _:
+return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,_that.gapCount,_that.message);case _:
   return null;
 
 }
@@ -218,7 +216,7 @@ return $default(_that.phase,_that.attempt,_that.silentSince,_that.nextAttemptAt,
 
 
 class _FeedState extends FeedState {
-  const _FeedState({this.phase = ConnectionPhase.idle, this.attempt = 0, this.silentSince, this.nextAttemptAt, this.lastEventId, this.gapCount = 0, this.message}): super._();
+  const _FeedState({this.phase = ConnectionPhase.idle, this.attempt = 0, this.silentSince, this.nextAttemptAt, this.gapCount = 0, this.message}): super._();
   
 
 @override@JsonKey() final  ConnectionPhase phase;
@@ -228,8 +226,6 @@ class _FeedState extends FeedState {
 @override final  DateTime? silentSince;
 /// When the pending backoff timer fires. Drives the countdown.
 @override final  DateTime? nextAttemptAt;
-/// Highest SSE id seen, echoed back as `Last-Event-ID` on reconnect.
-@override final  int? lastEventId;
 /// How many times the server told us our resume point was too old. Each
 /// one is a hole in history we can never fill.
 @override@JsonKey() final  int gapCount;
@@ -245,16 +241,16 @@ _$FeedStateCopyWith<_FeedState> get copyWith => __$FeedStateCopyWithImpl<_FeedSt
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FeedState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.attempt, attempt) || other.attempt == attempt)&&(identical(other.silentSince, silentSince) || other.silentSince == silentSince)&&(identical(other.nextAttemptAt, nextAttemptAt) || other.nextAttemptAt == nextAttemptAt)&&(identical(other.lastEventId, lastEventId) || other.lastEventId == lastEventId)&&(identical(other.gapCount, gapCount) || other.gapCount == gapCount)&&(identical(other.message, message) || other.message == message));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FeedState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.attempt, attempt) || other.attempt == attempt)&&(identical(other.silentSince, silentSince) || other.silentSince == silentSince)&&(identical(other.nextAttemptAt, nextAttemptAt) || other.nextAttemptAt == nextAttemptAt)&&(identical(other.gapCount, gapCount) || other.gapCount == gapCount)&&(identical(other.message, message) || other.message == message));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,phase,attempt,silentSince,nextAttemptAt,lastEventId,gapCount,message);
+int get hashCode => Object.hash(runtimeType,phase,attempt,silentSince,nextAttemptAt,gapCount,message);
 
 @override
 String toString() {
-  return 'FeedState(phase: $phase, attempt: $attempt, silentSince: $silentSince, nextAttemptAt: $nextAttemptAt, lastEventId: $lastEventId, gapCount: $gapCount, message: $message)';
+  return 'FeedState(phase: $phase, attempt: $attempt, silentSince: $silentSince, nextAttemptAt: $nextAttemptAt, gapCount: $gapCount, message: $message)';
 }
 
 
@@ -265,7 +261,7 @@ abstract mixin class _$FeedStateCopyWith<$Res> implements $FeedStateCopyWith<$Re
   factory _$FeedStateCopyWith(_FeedState value, $Res Function(_FeedState) _then) = __$FeedStateCopyWithImpl;
 @override @useResult
 $Res call({
- ConnectionPhase phase, int attempt, DateTime? silentSince, DateTime? nextAttemptAt, int? lastEventId, int gapCount, String? message
+ ConnectionPhase phase, int attempt, DateTime? silentSince, DateTime? nextAttemptAt, int gapCount, String? message
 });
 
 
@@ -282,14 +278,13 @@ class __$FeedStateCopyWithImpl<$Res>
 
 /// Create a copy of FeedState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? phase = null,Object? attempt = null,Object? silentSince = freezed,Object? nextAttemptAt = freezed,Object? lastEventId = freezed,Object? gapCount = null,Object? message = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? phase = null,Object? attempt = null,Object? silentSince = freezed,Object? nextAttemptAt = freezed,Object? gapCount = null,Object? message = freezed,}) {
   return _then(_FeedState(
 phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
 as ConnectionPhase,attempt: null == attempt ? _self.attempt : attempt // ignore: cast_nullable_to_non_nullable
 as int,silentSince: freezed == silentSince ? _self.silentSince : silentSince // ignore: cast_nullable_to_non_nullable
 as DateTime?,nextAttemptAt: freezed == nextAttemptAt ? _self.nextAttemptAt : nextAttemptAt // ignore: cast_nullable_to_non_nullable
-as DateTime?,lastEventId: freezed == lastEventId ? _self.lastEventId : lastEventId // ignore: cast_nullable_to_non_nullable
-as int?,gapCount: null == gapCount ? _self.gapCount : gapCount // ignore: cast_nullable_to_non_nullable
+as DateTime?,gapCount: null == gapCount ? _self.gapCount : gapCount // ignore: cast_nullable_to_non_nullable
 as int,message: freezed == message ? _self.message : message // ignore: cast_nullable_to_non_nullable
 as String?,
   ));

@@ -102,12 +102,24 @@ class PriceBloc extends Bloc<PriceEvent, PriceState> {
 
       // Direction is the *net* move across the window, so a burst produces one
       // flash in the direction the price actually went.
+      //
+      // Measured on the mid, not the bid. Comparing bids alone gets the sign
+      // wrong whenever the bid rounds to the same value but the ask moves -
+      // the old code fell through to `down` for an ask that had gone *up*.
+      // Both sides round independently to the instrument's decimals, so that
+      // is reachable, most easily on the low-precision instruments.
       final bool changed = previous.bid != tick.bid || previous.ask != tick.ask;
-      final PriceDirection direction = !previous.hasPrice || !changed
-          ? PriceDirection.none
-          : (tick.bid > previous.bid!
-              ? PriceDirection.up
-              : PriceDirection.down);
+      final double mid = (tick.bid + tick.ask) / 2;
+      final double previousMid = previous.hasPrice
+          ? (previous.bid! + previous.ask!) / 2
+          : mid;
+
+      final PriceDirection direction =
+          !previous.hasPrice || !changed || mid == previousMid
+              ? PriceDirection.none
+              : (mid > previousMid
+                  ? PriceDirection.up
+                  : PriceDirection.down);
 
       quotes[tick.symbol] = PriceCell(
         bid: tick.bid,

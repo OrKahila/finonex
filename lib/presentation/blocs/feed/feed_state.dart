@@ -53,9 +53,6 @@ abstract class FeedState with _$FeedState {
     /// When the pending backoff timer fires. Drives the countdown.
     DateTime? nextAttemptAt,
 
-    /// Highest SSE id seen, echoed back as `Last-Event-ID` on reconnect.
-    int? lastEventId,
-
     /// How many times the server told us our resume point was too old. Each
     /// one is a hole in history we can never fill.
     @Default(0) int gapCount,

@@ -155,6 +155,32 @@ void main() {
       expect(cell('EURUSD').revision, 1);
     });
 
+    test('an ask-only move flashes in the direction the ask went', () async {
+      // The bid rounds to the same value while the ask moves up. Comparing
+      // bids alone would call this a down-tick and paint the row red.
+      await feed(<Tick>[tick(ts: 1000, id: 1, bid: 1.0812, ask: 1.0814)]);
+      await feed(<Tick>[tick(ts: 1001, id: 2, bid: 1.0812, ask: 1.0816)]);
+
+      expect(cell('EURUSD').direction, PriceDirection.up);
+      expect(cell('EURUSD').revision, 2, reason: 'the price did move');
+    });
+
+    test('an ask-only move down flashes down', () async {
+      await feed(<Tick>[tick(ts: 1000, id: 1, bid: 1.0812, ask: 1.0816)]);
+      await feed(<Tick>[tick(ts: 1001, id: 2, bid: 1.0812, ask: 1.0814)]);
+
+      expect(cell('EURUSD').direction, PriceDirection.down);
+    });
+
+    test('a spread change with an unchanged mid has no direction', () async {
+      // Both sides moved, the market did not. Painting this red or green
+      // would be inventing a signal.
+      await feed(<Tick>[tick(ts: 1000, id: 1, bid: 1.0, ask: 1.2)]);
+      await feed(<Tick>[tick(ts: 1001, id: 2, bid: 0.9, ask: 1.3)]);
+
+      expect(cell('EURUSD').direction, PriceDirection.none);
+    });
+
     test('an unchanged price does not bump the revision', () async {
       await feed(<Tick>[tick(ts: 1000, id: 1, bid: 5.0, ask: 5.1)]);
       await feed(<Tick>[tick(ts: 1001, id: 2, bid: 5.0, ask: 5.1)]);

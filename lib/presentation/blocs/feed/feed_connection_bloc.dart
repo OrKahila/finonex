@@ -78,6 +78,15 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
   int _attempt = 0;
   int _authRetries = 0;
 
+  /// Highest SSE id seen, echoed back as `Last-Event-ID` on reconnect.
+  ///
+  /// Private, and deliberately not part of [FeedState]. It advances on
+  /// essentially every tick, so holding it in state meant emitting a new state
+  /// per tick - which made the "control plane is low-frequency" claim false and
+  /// rebuilt the connection banner at tick rate. Nothing in the UI reads it;
+  /// it is a resume cursor, not something to render.
+  int? _lastEventId;
+
   DateTime? _lastActivityAt;
   DateTime? _streamOpenedAt;
 
@@ -106,6 +115,7 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
   void _onStopped(FeedStopped event, Emitter<FeedState> emit) {
     _started = false;
     _suspended = false;
+    _lastEventId = null;
     _teardownConnection();
     _cancelTimers();
     unawaited(_networkSubscription?.cancel());
@@ -162,7 +172,7 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
 
       final SseConnection connection = await _transport.connect(
         token: token,
-        lastEventId: state.lastEventId,
+        lastEventId: _lastEventId,
       );
 
       // A teardown happened while we were opening; drop this socket.
@@ -255,9 +265,12 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
         _promoteToLive(emit);
 
       case final SseEvent sseEvent:
+        // Advance the resume cursor. A duplicate replays an older id, so this
+        // only ever moves forward.
         final int? id = sseEvent.id;
-        final int? knownId = state.lastEventId;
-        final bool advancesId = id != null && (knownId == null || id > knownId);
+        if (id != null && (_lastEventId == null || id > _lastEventId!)) {
+          _lastEventId = id;
+        }
 
         if (isGapEvent(sseEvent)) {
           // We asked to resume from an id the server no longer buffers. The
@@ -267,7 +280,6 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
             silentSince: null,
             nextAttemptAt: null,
             gapCount: state.gapCount + 1,
-            lastEventId: advancesId ? id : knownId,
           ));
           return;
         }
@@ -279,17 +291,9 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
           _sink.add(tick);
         }
 
-        // Emit only when something the UI cares about actually changed. This
-        // is the line that keeps a 220-tick burst from producing 220 state
-        // emissions.
-        if (advancesId || state.phase != ConnectionPhase.live) {
-          emit(state.copyWith(
-            phase: ConnectionPhase.live,
-            silentSince: null,
-            nextAttemptAt: null,
-            lastEventId: advancesId ? id : knownId,
-          ));
-        }
+        // The only thing a run of ordinary ticks can change for the UI is
+        // "we are live now". Once that is true, ticks emit nothing at all.
+        _promoteToLive(emit);
     }
   }
 

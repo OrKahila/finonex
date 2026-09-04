@@ -122,16 +122,16 @@ void main() {
         final Harness h = Harness(async)..connectAndGoLive();
         final int statesAfterLive = h.states.length;
 
+        // A burst's worth, deliberately more than the server's 220.
         for (int i = 2; i <= 51; i++) {
           h.transport.latest.sendTick(id: i, ts: 1000 + i);
         }
         async.flushMicrotasks();
 
         expect(h.sink.ticks.length, 51);
-        // 50 ticks must not cost 50 UI states. The id advancing is the only
-        // reason any state is emitted at all here.
-        expect(h.states.length - statesAfterLive, lessThanOrEqualTo(50));
-        expect(h.bloc.state.lastEventId, 51);
+        // The control plane is meant to be low-frequency: once the stream is
+        // live, a run of ordinary ticks changes nothing the UI can see.
+        expect(h.states.length - statesAfterLive, 0);
         h.dispose();
       });
     });
