@@ -47,15 +47,34 @@ class WatchlistView extends StatelessWidget {
     final PriceStore store = getIt<PriceStore>();
     final AppConfig config = getIt<AppConfig>();
 
-    return BlocListener<FeedConnectionBloc, FeedState>(
-      // The feed is the only thing that can discover our credentials are dead,
-      // and the only path back to a login screen.
-      listenWhen: (FeedState previous, FeedState current) =>
-          current.phase == ConnectionPhase.authFailed &&
-          previous.phase != ConnectionPhase.authFailed,
-      listener: (BuildContext context, FeedState state) {
-        context.read<AuthBloc>().add(const AuthEvent.sessionRejected());
-      },
+    return MultiBlocListener(
+      listeners: <BlocListener<FeedConnectionBloc, FeedState>>[
+        BlocListener<FeedConnectionBloc, FeedState>(
+          // The feed is the only thing that can discover our credentials are
+          // dead, and the only path back to a login screen.
+          listenWhen: (FeedState previous, FeedState current) =>
+              current.phase == ConnectionPhase.authFailed &&
+              previous.phase != ConnectionPhase.authFailed,
+          listener: (BuildContext context, FeedState state) {
+            context.read<AuthBloc>().add(const AuthEvent.sessionRejected());
+          },
+        ),
+        BlocListener<FeedConnectionBloc, FeedState>(
+          // The instrument list is fetched once, so a server that was down at
+          // startup leaves the screen stuck on an error while ticks pour into
+          // a store with no rows to show them. The feed reaching `live` is
+          // proof the server is answering again, so retry off the back of it
+          // rather than making the user find the button.
+          listenWhen: (FeedState previous, FeedState current) =>
+              current.phase == ConnectionPhase.live &&
+              previous.phase != ConnectionPhase.live,
+          listener: (BuildContext context, FeedState state) {
+            if (context.read<WatchlistBloc>().state is WatchlistFailed) {
+              context.read<WatchlistBloc>().add(const WatchlistEvent.retried());
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Pulse'),

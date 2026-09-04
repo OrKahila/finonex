@@ -204,7 +204,7 @@ it rather than hide it.
 
 ## 8. Tests: what I chose and why
 
-86 tests in the app plus 11 in the plugin. Chosen for risk, not coverage.
+89 tests in the app plus 11 in the plugin. Chosen for risk, not coverage.
 
 - **`sse_parser_test`** (20) - the field grammar, comments as first-class
   messages, id persistence across id-less events, one-byte-at-a-time chunk
@@ -227,6 +227,8 @@ it rather than hide it.
 - **`connection_banner_test`** (7) - each phase says something the user can act
   on. Catching the 4-second stalled window by screenshot is luck; asserting it
   is not.
+- **`watchlist_recovery_test`** (3) - the feed recovering also recovers the
+  screen. See below.
 
 Two real bugs were found by tests rather than by me:
 - The flash controller ran `forward(from: 1)`, so the wash started fully faded
@@ -235,8 +237,18 @@ Two real bugs were found by tests rather than by me:
   expiry *before* the code that read them, so healthy-reset and expected-drop
   detection both silently never fired.
 
-A third - the equal-timestamp bug in §3 - was found only by running against the
-real server, which is the honest argument for doing both.
+Two more were found only by running the thing, which is the honest argument for
+doing both:
+- The equal-timestamp bug in §3.
+- **The feed recovered but the screen did not.** The server died while the app
+  was open. The feed did everything right - backed off, capped at 15s, re-logged
+  in silently when the server returned, went green. But `/instruments` is
+  fetched once, so the watchlist stayed pinned to its error screen while ticks
+  poured into a store with no rows to render them. The connection said "Live"
+  above an empty list. Fixed by retrying the instrument load when the feed
+  transitions to live, which is the app's own proof the server is answering
+  again. This is the kind of bug that unit tests structurally cannot find: every
+  component was behaving correctly on its own.
 
 ## 9. What I cut, and what I would do next
 
