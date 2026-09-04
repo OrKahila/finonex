@@ -148,9 +148,27 @@ server can still serve*. Because we conflate, we also never render every tick -
 we render every *price*, which for a watchlist is the same thing and for a chart
 is not.
 
-**Known gap**: ids are monotonic, so a client can detect a hole itself by
-watching for id discontinuities, even when the server does not announce one.
-Pulse does not do this today. It would be my next addition - see §9.
+**On detecting holes ourselves.** Ids are monotonic, so a client *could* watch
+for discontinuities rather than waiting to be told. Pulse does not, and for
+this server that is a deliberate call rather than an oversight.
+
+The server only drops events in one place: `write()` skips while a connection
+is flagged stalled. Everything else is a contiguous, ordered TCP stream. And
+because our own watchdog tears a silent socket down at 12s - well inside the
+server's 25s stall - we always reconnect with `Last-Event-ID`, which either
+replays the missed range or answers `gap`. Either way the server tells us. So
+the two mechanisms are coupled: **server-side gap reporting is sufficient only
+because the stall threshold is below the stall duration.** Raise
+`stallReconnectAfter` past 25s and holes would start passing silently.
+
+Naive `lastId + 1` detection would also be wrong here without care: duplicates
+replay older ids, and the `gap` event and malformed lines carry no `id` of
+their own (they inherit the last one, per spec), so a jump straight after a gap
+is expected rather than a discovery. A correct implementation has to ignore
+ids at or below the cursor and suppress the first jump after a gap notice.
+
+Worth having against a real feed, where multiple upstreams and fan-out make
+silent holes ordinary. Not worth the moving parts against this one.
 
 ## 5. Stall detection: 8s and 12s
 
