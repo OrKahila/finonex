@@ -18,6 +18,7 @@ import '../blocs/watchlist/watchlist_state.dart';
 import '../widgets/connection_banner.dart';
 import '../widgets/feed_diagnostics.dart';
 import '../widgets/price_row.dart';
+import 'instrument_detail_screen.dart';
 
 class WatchlistScreen extends StatelessWidget {
   const WatchlistScreen({super.key});
@@ -128,6 +129,7 @@ class _InstrumentList extends StatelessWidget {
           instrument: instrument,
           listenable: store.listenableFor(instrument.symbol),
           config: config,
+          onTap: () => _openDetail(context, instrument),
         );
       },
     );
@@ -147,6 +149,27 @@ class _InstrumentList extends StatelessWidget {
       },
     );
   }
+}
+
+/// The detail route is pushed on the root navigator, which sits above the
+/// providers in [WatchlistScreen], so the feed bloc is handed down explicitly
+/// rather than looked up from a context that cannot see it.
+void _openDetail(BuildContext context, Instrument instrument) {
+  final FeedConnectionBloc feed = context.read<FeedConnectionBloc>();
+
+  Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      builder: (_) => BlocProvider<FeedConnectionBloc>.value(
+        value: feed,
+        child: InstrumentDetailScreen(
+          instrument: instrument,
+          store: getIt<PriceStore>(),
+          config: getIt<AppConfig>(),
+          clock: getIt<Clock>(),
+        ),
+      ),
+    ),
+  );
 }
 
 class _ColumnHeaders extends StatelessWidget {

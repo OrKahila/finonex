@@ -55,6 +55,12 @@ class PriceStore implements TickSink {
   /// Newest pending tick per symbol; last write wins within a window.
   final Map<String, Tick> _pending = <String, Tick>{};
 
+  /// Bounded per-symbol history, for the detail screen's sparkline and session
+  /// extremes. Not a notifier: the detail screen already rebuilds on its
+  /// symbol's price notifier, so it can read this synchronously and we avoid a
+  /// second write per symbol per flush.
+  final Map<String, _History> _histories = <String, _History>{};
+
   final ValueNotifier<FeedStats> stats =
       ValueNotifier<FeedStats>(const FeedStats());
 
@@ -69,6 +75,9 @@ class PriceStore implements TickSink {
   /// not ticked yet still render an empty row.
   ValueListenable<PriceCell> listenableFor(String symbol) =>
       _notifierFor(symbol);
+
+  SymbolHistory historyFor(String symbol) =>
+      _histories[symbol]?.snapshot() ?? SymbolHistory.empty;
 
   ValueNotifier<PriceCell> _notifierFor(String symbol) => _cells.putIfAbsent(
         symbol,
@@ -138,6 +147,10 @@ class PriceStore implements TickSink {
             ? PriceDirection.none
             : (tick.bid > previous.bid! ? PriceDirection.up : PriceDirection.down);
 
+        _histories
+            .putIfAbsent(tick.symbol, () => _History(_config.sparklineDepth))
+            .add(tick.bid);
+
         notifier.value = PriceCell(
           bid: tick.bid,
           ask: tick.ask,
@@ -194,6 +207,40 @@ class PriceStore implements TickSink {
     }
     _cells.clear();
     stats.dispose();
+  }
+}
+
+/// Ring buffer of recent prices plus running session extremes.
+class _History {
+  _History(this._capacity) : _ring = List<double>.filled(_capacity, 0);
+
+  final int _capacity;
+  final List<double> _ring;
+
+  int _index = 0;
+  int _size = 0;
+  double? _high;
+  double? _low;
+
+  void add(double price) {
+    _ring[_index] = price;
+    _index = (_index + 1) % _capacity;
+    if (_size < _capacity) _size++;
+
+    // Extremes are for the whole session, not just the visible tail.
+    if (_high == null || price > _high!) _high = price;
+    if (_low == null || price < _low!) _low = price;
+  }
+
+  SymbolHistory snapshot() {
+    final int start = _size < _capacity ? 0 : _index;
+    return SymbolHistory(
+      recent: <double>[
+        for (int i = 0; i < _size; i++) _ring[(start + i) % _capacity],
+      ],
+      high: _high,
+      low: _low,
+    );
   }
 }
 

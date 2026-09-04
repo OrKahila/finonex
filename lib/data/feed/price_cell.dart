@@ -51,6 +51,28 @@ class PriceCell {
       'rev: $revision, stale: $isStale)';
 }
 
+/// A symbol's session so far: a bounded tail of recent prices plus the
+/// extremes seen since the app started.
+class SymbolHistory {
+  const SymbolHistory({
+    required this.recent,
+    this.high,
+    this.low,
+  });
+
+  static const SymbolHistory empty =
+      SymbolHistory(recent: <double>[]);
+
+  /// Oldest to newest. Bounded by AppConfig.sparklineDepth, so a session that
+  /// runs for hours costs the same memory as one that runs for a minute.
+  final List<double> recent;
+
+  final double? high;
+  final double? low;
+
+  bool get hasData => recent.isNotEmpty;
+}
+
 /// Counters for the diagnostics row. Updated once per flush, never per tick.
 class FeedStats {
   const FeedStats({

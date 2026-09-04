@@ -218,6 +218,29 @@ void main() {
     });
   });
 
+  group('session history', () {
+    test('tracks extremes across the whole session, not just the window', () {
+      const AppConfig shallow = AppConfig(sparklineDepth: 3);
+      final PriceStore small = PriceStore(shallow, clock, scheduler);
+
+      const List<double> bids = <double>[5, 9, 1, 6, 7];
+      for (int i = 0; i < bids.length; i++) {
+        small.add(tick(ts: 1000 + i, id: i + 1, bid: bids[i]));
+        scheduler.flush();
+      }
+
+      final SymbolHistory history = small.historyFor('EURUSD');
+      expect(history.high, 9, reason: 'the peak scrolled out of the tail');
+      expect(history.low, 1);
+      expect(history.recent, <double>[1, 6, 7], reason: 'oldest to newest');
+      small.dispose();
+    });
+
+    test('an unknown symbol has an empty history rather than throwing', () {
+      expect(store.historyFor('NOPE').hasData, isFalse);
+    });
+  });
+
   group('diagnostics', () {
     test('malformed events are counted', () {
       store.noteMalformed();
@@ -268,3 +291,5 @@ void fakeTimerSweep(PriceStore store, MutableClock clock, AppConfig config) {
   store.flushNow();
   expect(cell.value.isStale, isFalse);
 }
+
+// Appended: history feeds the detail screen's sparkline and session extremes.
