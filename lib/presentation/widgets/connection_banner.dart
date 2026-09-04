@@ -107,6 +107,10 @@ class _ConnectionBannerState extends State<ConnectionBanner> {
           PulseColors.offline,
           'Device offline - not retrying until the network returns',
         ),
+      ConnectionPhase.suspended => (
+          PulseColors.connecting,
+          'Paused while in the background - prices are not current',
+        ),
       ConnectionPhase.authFailed => (
           PulseColors.offline,
           state.message ?? 'Authentication failed',

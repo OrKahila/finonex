@@ -30,6 +30,15 @@ sealed class FeedEvent with _$FeedEvent {
   const factory FeedEvent.networkStatusChanged(NetworkStatus status) =
       FeedNetworkStatusChanged;
 
+  /// The app went to the background. Raised on `paused` only - never on
+  /// `inactive`, which fires for the app switcher, Control Centre and incoming
+  /// calls, where dropping the feed would be wrong.
+  const factory FeedEvent.appBackgrounded() = FeedAppBackgrounded;
+
+  /// The app came back. Treated as new information rather than a failure, the
+  /// same way reachability returning is.
+  const factory FeedEvent.appForegrounded() = FeedAppForegrounded;
+
   /// Fired ~15s before the current token dies, so the inevitable drop at
   /// expiry can be answered with an instant reconnect instead of a login
   /// round-trip.

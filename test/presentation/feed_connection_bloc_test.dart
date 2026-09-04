@@ -400,6 +400,100 @@ void main() {
     });
   });
 
+  group('app lifecycle', () {
+    test('backgrounding drops the connection and stops all attempts', () {
+      fakeAsync((FakeAsync async) {
+        final Harness h = Harness(async)..connectAndGoLive();
+        final FakeSseConnection first = h.transport.latest;
+
+        h.bloc.add(const FeedEvent.appBackgrounded());
+        async.flushMicrotasks();
+
+        expect(first.closedByClient, isTrue,
+            reason: 'nobody is looking at the screen');
+        expect(h.phase, ConnectionPhase.suspended);
+
+        h.elapse(const Duration(minutes: 3));
+        expect(h.attempts, 1, reason: 'no reconnects while backgrounded');
+        h.dispose();
+      });
+    });
+
+    test('the phase never claims live across a background cycle', () {
+      fakeAsync((FakeAsync async) {
+        final Harness h = Harness(async)..connectAndGoLive();
+
+        h.bloc.add(const FeedEvent.appBackgrounded());
+        async.flushMicrotasks();
+        h.elapse(const Duration(minutes: 5));
+
+        // This is the whole point: on the frame the user comes back to, the
+        // banner must not be green above five-minute-old prices.
+        expect(h.phase, isNot(ConnectionPhase.live));
+        h.dispose();
+      });
+    });
+
+    test('foregrounding reconnects at once with a clean backoff', () {
+      fakeAsync((FakeAsync async) {
+        final Harness h = Harness(async);
+        h.transport.failAlways = const TransportException('refused');
+        h.start();
+
+        // Burn several backoff steps so the pending delay is long.
+        h.elapse(const Duration(seconds: 20));
+        final int burned = h.attempts;
+        expect(burned, greaterThan(3));
+
+        h.bloc.add(const FeedEvent.appBackgrounded());
+        async.flushMicrotasks();
+        h.elapse(const Duration(minutes: 1));
+        expect(h.attempts, burned, reason: 'silent while backgrounded');
+
+        h.transport.failAlways = null;
+        h.bloc.add(const FeedEvent.appForegrounded());
+        async.flushMicrotasks();
+
+        expect(h.attempts, burned + 1,
+            reason: 'coming back is new information, not another failure');
+        expect(h.bloc.state.attempt, 0);
+        h.dispose();
+      });
+    });
+
+    test('a resumed stream carries the last event id across the gap', () {
+      fakeAsync((FakeAsync async) {
+        final Harness h = Harness(async)..connectAndGoLive(id: 12, ts: 1000);
+
+        h.bloc.add(const FeedEvent.appBackgrounded());
+        async.flushMicrotasks();
+        h.elapse(const Duration(minutes: 2));
+
+        h.bloc.add(const FeedEvent.appForegrounded());
+        async.flushMicrotasks();
+
+        expect(h.transport.attempts.last.lastEventId, 12);
+        h.dispose();
+      });
+    });
+
+    test('foregrounding without a preceding background does nothing', () {
+      fakeAsync((FakeAsync async) {
+        final Harness h = Harness(async)..connectAndGoLive();
+        final int before = h.attempts;
+
+        // What a bare `inactive` (Control Centre, app switcher) looks like:
+        // resume fires, but nothing was ever torn down.
+        h.bloc.add(const FeedEvent.appForegrounded());
+        async.flushMicrotasks();
+
+        expect(h.attempts, before);
+        expect(h.phase, ConnectionPhase.live);
+        h.dispose();
+      });
+    });
+  });
+
   group('resume', () {
     test('reconnects with the highest id seen', () {
       fakeAsync((FakeAsync async) {

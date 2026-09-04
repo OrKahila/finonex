@@ -25,6 +25,12 @@ enum ConnectionPhase {
   /// We deliberately do not burn attempts in this state.
   offline,
 
+  /// The app is in the background. Nothing can be rendered, so holding a
+  /// socket open would spend battery, data and the server's replay buffer on
+  /// data nobody can see. Entering this phase is also what stops the banner
+  /// claiming "Live" over pre-suspension prices when the user comes back.
+  suspended,
+
   /// The server rejected our credentials. The only state that needs a human.
   authFailed,
 }

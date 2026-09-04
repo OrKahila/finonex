@@ -42,6 +42,8 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
     on<FeedWatchdogTicked>(_onWatchdogTicked);
     on<FeedNetworkStatusChanged>(_onNetworkStatusChanged);
     on<FeedTokenRefreshRequested>(_onTokenRefreshRequested);
+    on<FeedAppBackgrounded>(_onAppBackgrounded);
+    on<FeedAppForegrounded>(_onAppForegrounded);
   }
 
   final SseTransport _transport;
@@ -62,6 +64,11 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
 
   bool _started = false;
   bool _connectInFlight = false;
+
+  /// True between `paused` and `resumed`. Suppresses connection attempts the
+  /// same way being offline does - there is no point holding a stream open for
+  /// a screen nobody is looking at.
+  bool _suspended = false;
 
   /// Bumped on every teardown. Async callbacks from a previous connection
   /// carry a stale generation and are ignored - the cheapest way to make
@@ -98,6 +105,7 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
 
   void _onStopped(FeedStopped event, Emitter<FeedState> emit) {
     _started = false;
+    _suspended = false;
     _teardownConnection();
     _cancelTimers();
     unawaited(_networkSubscription?.cancel());
@@ -124,7 +132,7 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
     FeedConnectRequested event,
     Emitter<FeedState> emit,
   ) async {
-    if (!_started || _connectInFlight) return;
+    if (!_started || _connectInFlight || _suspended) return;
 
     // Never spin attempts while the platform says there is no network.
     if (!_monitor.current.isOnline) {
@@ -303,7 +311,7 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
     final bool expectedDrop = _wasExpectedTokenDrop();
 
     _teardownConnection();
-    if (!_started) return;
+    if (!_started || _suspended) return;
 
     if (!_monitor.current.isOnline) {
       emit(state.copyWith(
@@ -360,6 +368,56 @@ class FeedConnectionBloc extends Bloc<FeedEvent, FeedState> {
       silentSince: null,
       message: message,
     ));
+  }
+
+  // --- app lifecycle -------------------------------------------------------
+
+  /// Drops everything the moment the app is backgrounded.
+  ///
+  /// This is also what closes the "resume window" hole: because the phase
+  /// becomes [ConnectionPhase.suspended] on the way out, there is no frame
+  /// after the user returns on which the banner still reads "Live" above
+  /// prices captured before the app was suspended.
+  void _onAppBackgrounded(
+    FeedAppBackgrounded event,
+    Emitter<FeedState> emit,
+  ) {
+    if (!_started || _suspended) return;
+    _suspended = true;
+
+    _teardownConnection();
+    _backoffTimer?.cancel();
+    _backoffTimer = null;
+
+    emit(state.copyWith(
+      phase: ConnectionPhase.suspended,
+      nextAttemptAt: null,
+      silentSince: null,
+      message: null,
+    ));
+  }
+
+  /// Coming back is new information, not a failure: reset the backoff and
+  /// reconnect at once rather than waiting for the watchdog to notice.
+  void _onAppForegrounded(
+    FeedAppForegrounded event,
+    Emitter<FeedState> emit,
+  ) {
+    if (!_suspended) return;
+    _suspended = false;
+    if (!_started) return;
+
+    _attempt = 0;
+    emit(state.copyWith(
+      phase: ConnectionPhase.connecting,
+      // Reset the visible counter too - leaving a stale "attempt 6" in state
+      // would misreport a fresh start as a continuing failure.
+      attempt: 0,
+      nextAttemptAt: null,
+      silentSince: null,
+      message: null,
+    ));
+    add(const FeedEvent.connectRequested());
   }
 
   // --- stall detection -----------------------------------------------------

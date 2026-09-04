@@ -35,6 +35,10 @@ class HttpSseTransport implements SseTransport {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
       request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+      // A stream we intend to abort is the last thing that should be pooled
+      // for reuse: keeping it persistent is what lets a cancelled subscription
+      // leave the socket open. See _HttpSseConnection.close.
+      request.persistentConnection = false;
       if (lastEventId != null) {
         request.headers.set('Last-Event-ID', '$lastEventId');
       }
@@ -55,12 +59,12 @@ class HttpSseTransport implements SseTransport {
       );
     }
 
-    return _HttpSseConnection(response);
+    return _HttpSseConnection(request, response);
   }
 }
 
 class _HttpSseConnection implements SseConnection {
-  _HttpSseConnection(this._response) {
+  _HttpSseConnection(this._request, this._response) {
     _subscription = decodeSseStream(_response).listen(
       _controller.add,
       onError: _controller.addError,
@@ -71,6 +75,7 @@ class _HttpSseConnection implements SseConnection {
     );
   }
 
+  final HttpClientRequest _request;
   final HttpClientResponse _response;
   final StreamController<SseMessage> _controller =
       StreamController<SseMessage>();
@@ -85,9 +90,18 @@ class _HttpSseConnection implements SseConnection {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    // Cancelling an in-flight response subscription destroys the socket, which
-    // is what we want: a stalled connection must actually go away, not linger.
+
+    // Cancelling stops us consuming, but on its own it does NOT close the
+    // socket - HttpClient hands it back to its connection pool, leaving the
+    // server writing ticks into a connection nobody is reading. Verified with
+    // lsof: the socket stayed ESTABLISHED for as long as it was watched.
+    // abort() is what actually tears it down.
     await _subscription.cancel();
+    try {
+      _request.abort();
+    } on Object {
+      // Already finished; nothing to abort.
+    }
     if (!_controller.isClosed) await _controller.close();
   }
 }

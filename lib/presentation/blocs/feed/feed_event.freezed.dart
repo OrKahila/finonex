@@ -55,7 +55,7 @@ extension FeedEventPatterns on FeedEvent {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( FeedStarted value)?  started,TResult Function( FeedStopped value)?  stopped,TResult Function( FeedConnectRequested value)?  connectRequested,TResult Function( FeedMessageReceived value)?  messageReceived,TResult Function( FeedStreamClosed value)?  streamClosed,TResult Function( FeedWatchdogTicked value)?  watchdogTicked,TResult Function( FeedNetworkStatusChanged value)?  networkStatusChanged,TResult Function( FeedTokenRefreshRequested value)?  tokenRefreshRequested,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( FeedStarted value)?  started,TResult Function( FeedStopped value)?  stopped,TResult Function( FeedConnectRequested value)?  connectRequested,TResult Function( FeedMessageReceived value)?  messageReceived,TResult Function( FeedStreamClosed value)?  streamClosed,TResult Function( FeedWatchdogTicked value)?  watchdogTicked,TResult Function( FeedNetworkStatusChanged value)?  networkStatusChanged,TResult Function( FeedAppBackgrounded value)?  appBackgrounded,TResult Function( FeedAppForegrounded value)?  appForegrounded,TResult Function( FeedTokenRefreshRequested value)?  tokenRefreshRequested,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case FeedStarted() when started != null:
@@ -65,7 +65,9 @@ return connectRequested(_that);case FeedMessageReceived() when messageReceived !
 return messageReceived(_that);case FeedStreamClosed() when streamClosed != null:
 return streamClosed(_that);case FeedWatchdogTicked() when watchdogTicked != null:
 return watchdogTicked(_that);case FeedNetworkStatusChanged() when networkStatusChanged != null:
-return networkStatusChanged(_that);case FeedTokenRefreshRequested() when tokenRefreshRequested != null:
+return networkStatusChanged(_that);case FeedAppBackgrounded() when appBackgrounded != null:
+return appBackgrounded(_that);case FeedAppForegrounded() when appForegrounded != null:
+return appForegrounded(_that);case FeedTokenRefreshRequested() when tokenRefreshRequested != null:
 return tokenRefreshRequested(_that);case _:
   return orElse();
 
@@ -84,7 +86,7 @@ return tokenRefreshRequested(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( FeedStarted value)  started,required TResult Function( FeedStopped value)  stopped,required TResult Function( FeedConnectRequested value)  connectRequested,required TResult Function( FeedMessageReceived value)  messageReceived,required TResult Function( FeedStreamClosed value)  streamClosed,required TResult Function( FeedWatchdogTicked value)  watchdogTicked,required TResult Function( FeedNetworkStatusChanged value)  networkStatusChanged,required TResult Function( FeedTokenRefreshRequested value)  tokenRefreshRequested,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( FeedStarted value)  started,required TResult Function( FeedStopped value)  stopped,required TResult Function( FeedConnectRequested value)  connectRequested,required TResult Function( FeedMessageReceived value)  messageReceived,required TResult Function( FeedStreamClosed value)  streamClosed,required TResult Function( FeedWatchdogTicked value)  watchdogTicked,required TResult Function( FeedNetworkStatusChanged value)  networkStatusChanged,required TResult Function( FeedAppBackgrounded value)  appBackgrounded,required TResult Function( FeedAppForegrounded value)  appForegrounded,required TResult Function( FeedTokenRefreshRequested value)  tokenRefreshRequested,}){
 final _that = this;
 switch (_that) {
 case FeedStarted():
@@ -94,7 +96,9 @@ return connectRequested(_that);case FeedMessageReceived():
 return messageReceived(_that);case FeedStreamClosed():
 return streamClosed(_that);case FeedWatchdogTicked():
 return watchdogTicked(_that);case FeedNetworkStatusChanged():
-return networkStatusChanged(_that);case FeedTokenRefreshRequested():
+return networkStatusChanged(_that);case FeedAppBackgrounded():
+return appBackgrounded(_that);case FeedAppForegrounded():
+return appForegrounded(_that);case FeedTokenRefreshRequested():
 return tokenRefreshRequested(_that);}
 }
 /// A variant of `map` that fallback to returning `null`.
@@ -109,7 +113,7 @@ return tokenRefreshRequested(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( FeedStarted value)?  started,TResult? Function( FeedStopped value)?  stopped,TResult? Function( FeedConnectRequested value)?  connectRequested,TResult? Function( FeedMessageReceived value)?  messageReceived,TResult? Function( FeedStreamClosed value)?  streamClosed,TResult? Function( FeedWatchdogTicked value)?  watchdogTicked,TResult? Function( FeedNetworkStatusChanged value)?  networkStatusChanged,TResult? Function( FeedTokenRefreshRequested value)?  tokenRefreshRequested,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( FeedStarted value)?  started,TResult? Function( FeedStopped value)?  stopped,TResult? Function( FeedConnectRequested value)?  connectRequested,TResult? Function( FeedMessageReceived value)?  messageReceived,TResult? Function( FeedStreamClosed value)?  streamClosed,TResult? Function( FeedWatchdogTicked value)?  watchdogTicked,TResult? Function( FeedNetworkStatusChanged value)?  networkStatusChanged,TResult? Function( FeedAppBackgrounded value)?  appBackgrounded,TResult? Function( FeedAppForegrounded value)?  appForegrounded,TResult? Function( FeedTokenRefreshRequested value)?  tokenRefreshRequested,}){
 final _that = this;
 switch (_that) {
 case FeedStarted() when started != null:
@@ -119,7 +123,9 @@ return connectRequested(_that);case FeedMessageReceived() when messageReceived !
 return messageReceived(_that);case FeedStreamClosed() when streamClosed != null:
 return streamClosed(_that);case FeedWatchdogTicked() when watchdogTicked != null:
 return watchdogTicked(_that);case FeedNetworkStatusChanged() when networkStatusChanged != null:
-return networkStatusChanged(_that);case FeedTokenRefreshRequested() when tokenRefreshRequested != null:
+return networkStatusChanged(_that);case FeedAppBackgrounded() when appBackgrounded != null:
+return appBackgrounded(_that);case FeedAppForegrounded() when appForegrounded != null:
+return appForegrounded(_that);case FeedTokenRefreshRequested() when tokenRefreshRequested != null:
 return tokenRefreshRequested(_that);case _:
   return null;
 
@@ -137,7 +143,7 @@ return tokenRefreshRequested(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  started,TResult Function()?  stopped,TResult Function()?  connectRequested,TResult Function( SseMessage message)?  messageReceived,TResult Function( Object? error)?  streamClosed,TResult Function()?  watchdogTicked,TResult Function( NetworkStatus status)?  networkStatusChanged,TResult Function()?  tokenRefreshRequested,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  started,TResult Function()?  stopped,TResult Function()?  connectRequested,TResult Function( SseMessage message)?  messageReceived,TResult Function( Object? error)?  streamClosed,TResult Function()?  watchdogTicked,TResult Function( NetworkStatus status)?  networkStatusChanged,TResult Function()?  appBackgrounded,TResult Function()?  appForegrounded,TResult Function()?  tokenRefreshRequested,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case FeedStarted() when started != null:
 return started();case FeedStopped() when stopped != null:
@@ -146,7 +152,9 @@ return connectRequested();case FeedMessageReceived() when messageReceived != nul
 return messageReceived(_that.message);case FeedStreamClosed() when streamClosed != null:
 return streamClosed(_that.error);case FeedWatchdogTicked() when watchdogTicked != null:
 return watchdogTicked();case FeedNetworkStatusChanged() when networkStatusChanged != null:
-return networkStatusChanged(_that.status);case FeedTokenRefreshRequested() when tokenRefreshRequested != null:
+return networkStatusChanged(_that.status);case FeedAppBackgrounded() when appBackgrounded != null:
+return appBackgrounded();case FeedAppForegrounded() when appForegrounded != null:
+return appForegrounded();case FeedTokenRefreshRequested() when tokenRefreshRequested != null:
 return tokenRefreshRequested();case _:
   return orElse();
 
@@ -165,7 +173,7 @@ return tokenRefreshRequested();case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  started,required TResult Function()  stopped,required TResult Function()  connectRequested,required TResult Function( SseMessage message)  messageReceived,required TResult Function( Object? error)  streamClosed,required TResult Function()  watchdogTicked,required TResult Function( NetworkStatus status)  networkStatusChanged,required TResult Function()  tokenRefreshRequested,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  started,required TResult Function()  stopped,required TResult Function()  connectRequested,required TResult Function( SseMessage message)  messageReceived,required TResult Function( Object? error)  streamClosed,required TResult Function()  watchdogTicked,required TResult Function( NetworkStatus status)  networkStatusChanged,required TResult Function()  appBackgrounded,required TResult Function()  appForegrounded,required TResult Function()  tokenRefreshRequested,}) {final _that = this;
 switch (_that) {
 case FeedStarted():
 return started();case FeedStopped():
@@ -174,7 +182,9 @@ return connectRequested();case FeedMessageReceived():
 return messageReceived(_that.message);case FeedStreamClosed():
 return streamClosed(_that.error);case FeedWatchdogTicked():
 return watchdogTicked();case FeedNetworkStatusChanged():
-return networkStatusChanged(_that.status);case FeedTokenRefreshRequested():
+return networkStatusChanged(_that.status);case FeedAppBackgrounded():
+return appBackgrounded();case FeedAppForegrounded():
+return appForegrounded();case FeedTokenRefreshRequested():
 return tokenRefreshRequested();}
 }
 /// A variant of `when` that fallback to returning `null`
@@ -189,7 +199,7 @@ return tokenRefreshRequested();}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  started,TResult? Function()?  stopped,TResult? Function()?  connectRequested,TResult? Function( SseMessage message)?  messageReceived,TResult? Function( Object? error)?  streamClosed,TResult? Function()?  watchdogTicked,TResult? Function( NetworkStatus status)?  networkStatusChanged,TResult? Function()?  tokenRefreshRequested,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  started,TResult? Function()?  stopped,TResult? Function()?  connectRequested,TResult? Function( SseMessage message)?  messageReceived,TResult? Function( Object? error)?  streamClosed,TResult? Function()?  watchdogTicked,TResult? Function( NetworkStatus status)?  networkStatusChanged,TResult? Function()?  appBackgrounded,TResult? Function()?  appForegrounded,TResult? Function()?  tokenRefreshRequested,}) {final _that = this;
 switch (_that) {
 case FeedStarted() when started != null:
 return started();case FeedStopped() when stopped != null:
@@ -198,7 +208,9 @@ return connectRequested();case FeedMessageReceived() when messageReceived != nul
 return messageReceived(_that.message);case FeedStreamClosed() when streamClosed != null:
 return streamClosed(_that.error);case FeedWatchdogTicked() when watchdogTicked != null:
 return watchdogTicked();case FeedNetworkStatusChanged() when networkStatusChanged != null:
-return networkStatusChanged(_that.status);case FeedTokenRefreshRequested() when tokenRefreshRequested != null:
+return networkStatusChanged(_that.status);case FeedAppBackgrounded() when appBackgrounded != null:
+return appBackgrounded();case FeedAppForegrounded() when appForegrounded != null:
+return appForegrounded();case FeedTokenRefreshRequested() when tokenRefreshRequested != null:
 return tokenRefreshRequested();case _:
   return null;
 
@@ -531,6 +543,70 @@ as NetworkStatus,
 
 
 }
+
+/// @nodoc
+
+
+class FeedAppBackgrounded implements FeedEvent {
+  const FeedAppBackgrounded();
+  
+
+
+
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FeedAppBackgrounded);
+}
+
+
+@override
+int get hashCode => runtimeType.hashCode;
+
+@override
+String toString() {
+  return 'FeedEvent.appBackgrounded()';
+}
+
+
+}
+
+
+
+
+/// @nodoc
+
+
+class FeedAppForegrounded implements FeedEvent {
+  const FeedAppForegrounded();
+  
+
+
+
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FeedAppForegrounded);
+}
+
+
+@override
+int get hashCode => runtimeType.hashCode;
+
+@override
+String toString() {
+  return 'FeedEvent.appForegrounded()';
+}
+
+
+}
+
+
+
 
 /// @nodoc
 

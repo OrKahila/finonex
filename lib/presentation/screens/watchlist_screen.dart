@@ -15,6 +15,7 @@ import '../blocs/price/price_bloc.dart';
 import '../blocs/watchlist/watchlist_bloc.dart';
 import '../blocs/watchlist/watchlist_event.dart';
 import '../blocs/watchlist/watchlist_state.dart';
+import '../widgets/app_lifecycle_bridge.dart';
 import '../widgets/connection_banner.dart';
 import '../widgets/feed_diagnostics.dart';
 import '../widgets/price_row.dart';
@@ -37,7 +38,8 @@ class WatchlistScreen extends StatelessWidget {
         // TickSink port, and it outlives this screen.
         BlocProvider<PriceBloc>.value(value: getIt<PriceBloc>()),
       ],
-      child: const WatchlistView(),
+      // Below the providers, so it can reach both blocs.
+      child: const AppLifecycleBridge(child: WatchlistView()),
     );
   }
 }

@@ -82,6 +82,15 @@ void main() {
     expect(find.textContaining('offline'), findsOneWidget);
   });
 
+  testWidgets('being backgrounded says so rather than showing live',
+      (WidgetTester tester) async {
+    await pumpWith(tester, const FeedState(phase: ConnectionPhase.suspended));
+
+    expect(find.textContaining('Paused'), findsOneWidget);
+    expect(find.textContaining('not current'), findsOneWidget);
+    expect(find.text('Live'), findsNothing);
+  });
+
   testWidgets('auth failure surfaces the reason', (WidgetTester tester) async {
     await pumpWith(
       tester,
