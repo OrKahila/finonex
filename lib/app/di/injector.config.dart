@@ -21,6 +21,8 @@ import '../../core/app_config.dart' as _i207;
 import '../../core/clock.dart' as _i215;
 import '../../data/auth/auth_api.dart' as _i812;
 import '../../data/auth/auth_repository.dart' as _i344;
+import '../../data/feed/sse/http_sse_transport.dart' as _i314;
+import '../../data/feed/sse/sse_transport.dart' as _i929;
 import '../../data/platform/pulse_native_network_monitor.dart' as _i110;
 import '../../data/platform/pulse_native_secure_store.dart' as _i882;
 import '../../domain/ports/network_monitor.dart' as _i231;
@@ -56,6 +58,10 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i207.AppConfig>(),
         gh<_i215.Clock>(),
       ),
+    );
+    gh.lazySingleton<_i929.SseTransport>(
+      () =>
+          _i314.HttpSseTransport(gh<_i497.HttpClient>(), gh<_i207.AppConfig>()),
     );
     gh.lazySingleton<_i344.AuthRepository>(
       () => _i344.AuthRepository(
