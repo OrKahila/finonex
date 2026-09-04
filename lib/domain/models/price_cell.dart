@@ -1,7 +1,11 @@
 /// Which way the price moved on the last accepted update.
 enum PriceDirection { none, up, down }
 
-/// What one row shows. One of these per symbol, wrapped in a ValueNotifier.
+/// What one row shows: the current quote for one symbol.
+///
+/// Lives in `domain` rather than `data` because widgets render it directly - a
+/// data-layer type reaching the widget tree is a layering leak regardless of
+/// how it gets delivered.
 class PriceCell {
   const PriceCell({
     this.bid,
@@ -33,6 +37,13 @@ class PriceCell {
   /// Local time of the last accepted update, used for the staleness sweep.
   final DateTime? updatedAt;
 
+  /// A single shared instance for symbols that have not ticked yet.
+  ///
+  /// Reference stability matters: `BlocSelector` skips a rebuild when the
+  /// selected value is unchanged, and returning a fresh `PriceCell()` for
+  /// every empty row on every emit would defeat that.
+  static const PriceCell empty = PriceCell();
+
   bool get hasPrice => bid != null && ask != null;
 
   PriceCell copyWith({bool? isStale}) => PriceCell(
@@ -44,6 +55,21 @@ class PriceCell {
         isStale: isStale ?? this.isStale,
         updatedAt: updatedAt,
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PriceCell &&
+          other.bid == bid &&
+          other.ask == ask &&
+          other.ts == ts &&
+          other.direction == direction &&
+          other.revision == revision &&
+          other.isStale == isStale;
+
+  @override
+  int get hashCode =>
+      Object.hash(bid, ask, ts, direction, revision, isStale);
 
   @override
   String toString() =>

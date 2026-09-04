@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:finonex/core/clock.dart';
 import 'package:finonex/core/errors.dart';
+import 'package:finonex/core/periodic_ticker.dart';
 import 'package:finonex/data/auth/auth_api.dart';
 import 'package:finonex/data/auth/models/session.dart';
 import 'package:finonex/data/feed/conflation_scheduler.dart';
@@ -219,6 +220,20 @@ class RecordingTickSink implements TickSink {
 
   @override
   void noteMalformed() => malformed++;
+}
+
+/// Fires only when the test says so, so a bloc under test leaves no pending
+/// timer behind.
+class ManualPeriodicTicker implements PeriodicTicker {
+  void Function()? _onTick;
+
+  @override
+  void start(Duration interval, void Function() onTick) => _onTick = onTick;
+
+  @override
+  void stop() => _onTick = null;
+
+  void fire() => _onTick?.call();
 }
 
 /// Flushes only when the test says so.

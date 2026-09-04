@@ -6,8 +6,6 @@ import 'package:pulse_native/pulse_native.dart';
 
 import '../../core/app_config.dart';
 import '../../core/clock.dart';
-import '../../data/feed/price_store.dart';
-import '../../domain/ports/tick_sink.dart';
 
 /// Third-party and platform objects that we do not own and therefore cannot
 /// annotate directly.
@@ -43,10 +41,4 @@ abstract class RegisterModule {
   /// in-memory stub elsewhere. See packages/pulse_native.
   @lazySingleton
   PulseNativePlatform get pulseNative => PulseNativePlatform.instance;
-
-  /// The store is bound both to its own type (the UI reads per-symbol
-  /// listenables and diagnostics from it) and to the narrow [TickSink] the
-  /// connection bloc writes through.
-  @lazySingleton
-  TickSink tickSink(PriceStore store) => store;
 }

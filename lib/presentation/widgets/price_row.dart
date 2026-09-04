@@ -1,28 +1,29 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/theme/pulse_theme.dart';
 import '../../core/app_config.dart';
-import '../../data/feed/price_cell.dart';
 import '../../data/instruments/models/instrument.dart';
+import '../../domain/models/price_cell.dart';
+import '../blocs/price/price_bloc.dart';
+import '../blocs/price/price_state.dart';
 
 /// One instrument.
 ///
-/// The symbol and name are built once and never again. Only the price pair
-/// listens to the store, so a tick rebuilds a single leaf - not the row, not
-/// the list. [RepaintBoundary] keeps a flashing row from repainting its
-/// neighbours.
+/// The symbol and name are built once and never again. Only the price pair is
+/// wrapped in a [BlocSelector], so a state emission that does not change *this*
+/// symbol's cell rebuilds nothing here at all - the selector compares and
+/// returns without calling setState. [RepaintBoundary] keeps a flashing row
+/// from repainting its neighbours.
 class PriceRow extends StatelessWidget {
   const PriceRow({
     required this.instrument,
-    required this.listenable,
     required this.config,
     this.onTap,
     super.key,
   });
 
   final Instrument instrument;
-  final ValueListenable<PriceCell> listenable;
   final AppConfig config;
   final VoidCallback? onTap;
 
@@ -68,9 +69,10 @@ class PriceRow extends StatelessWidget {
               ),
               Expanded(
                 flex: 6,
-                child: ValueListenableBuilder<PriceCell>(
-                  valueListenable: listenable,
-                  builder: (BuildContext context, PriceCell cell, _) {
+                child: BlocSelector<PriceBloc, PriceState, PriceCell>(
+                  selector: (PriceState state) =>
+                      state.cellFor(instrument.symbol),
+                  builder: (BuildContext context, PriceCell cell) {
                     return FlashingPrices(
                       cell: cell,
                       decimals: instrument.decimals,

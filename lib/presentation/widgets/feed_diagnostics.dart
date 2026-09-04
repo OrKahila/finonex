@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/theme/pulse_theme.dart';
-import '../../data/feed/price_cell.dart';
-import '../../data/feed/price_store.dart';
+import '../../domain/models/price_cell.dart';
+import '../blocs/price/price_bloc.dart';
+import '../blocs/price/price_state.dart';
 
 /// A one-line readout of what the feed threw at us and what we did about it.
 ///
@@ -10,15 +12,13 @@ import '../../data/feed/price_store.dart';
 /// counter that climbs while the app stays smooth is evidence. Updates once
 /// per conflation window, never per tick.
 class FeedDiagnostics extends StatelessWidget {
-  const FeedDiagnostics({required this.store, super.key});
-
-  final PriceStore store;
+  const FeedDiagnostics({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<FeedStats>(
-      valueListenable: store.stats,
-      builder: (BuildContext context, FeedStats stats, _) {
+    return BlocSelector<PriceBloc, PriceState, FeedStats>(
+      selector: (PriceState state) => state.stats,
+      builder: (BuildContext context, FeedStats stats) {
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),

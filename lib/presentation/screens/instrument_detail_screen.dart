@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/theme/pulse_theme.dart';
 import '../../core/app_config.dart';
 import '../../core/clock.dart';
-import '../../data/feed/price_cell.dart';
-import '../../data/feed/price_store.dart';
 import '../../data/instruments/models/instrument.dart';
+import '../../domain/models/price_cell.dart';
+import '../blocs/price/price_bloc.dart';
+import '../blocs/price/price_state.dart';
 import '../widgets/connection_banner.dart';
 import '../widgets/sparkline.dart';
 
 /// Session high/low and a sparkline for one instrument.
 ///
-/// Reads the same per-symbol notifier the row uses, so opening this screen
-/// costs one more listener - not a second data path.
+/// Selects the same symbol out of the same [PriceBloc] the rows use, so
+/// opening this screen costs one more selector - not a second data path.
 class InstrumentDetailScreen extends StatelessWidget {
   const InstrumentDetailScreen({
     required this.instrument,
-    required this.store,
     required this.config,
     required this.clock,
     super.key,
   });
 
   final Instrument instrument;
-  final PriceStore store;
   final AppConfig config;
   final Clock clock;
 
@@ -46,11 +46,13 @@ class InstrumentDetailScreen extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: ValueListenableBuilder<PriceCell>(
-              valueListenable: store.listenableFor(instrument.symbol),
-              builder: (BuildContext context, PriceCell cell, _) {
+            child: BlocSelector<PriceBloc, PriceState, PriceCell>(
+              selector: (PriceState state) => state.cellFor(instrument.symbol),
+              builder: (BuildContext context, PriceCell cell) {
+                // Read on demand rather than carried in state - see
+                // PriceBloc.historyFor.
                 final SymbolHistory history =
-                    store.historyFor(instrument.symbol);
+                    context.read<PriceBloc>().historyFor(instrument.symbol);
 
                 return Padding(
                   padding: const EdgeInsets.all(16),

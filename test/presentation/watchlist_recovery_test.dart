@@ -2,7 +2,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:finonex/app/di/injector.dart';
 import 'package:finonex/core/app_config.dart';
 import 'package:finonex/core/clock.dart';
-import 'package:finonex/data/feed/price_store.dart';
+import 'package:finonex/presentation/blocs/price/price_bloc.dart';
 import 'package:finonex/presentation/blocs/auth/auth_bloc.dart';
 import 'package:finonex/presentation/blocs/auth/auth_event.dart';
 import 'package:finonex/presentation/blocs/auth/auth_state.dart';
@@ -51,14 +51,10 @@ void main() {
     watchlist = MockWatchlistBloc();
     auth = MockAuthBloc();
 
-    if (!getIt.isRegistered<PriceStore>()) {
+    if (!getIt.isRegistered<AppConfig>()) {
       getIt
         ..registerSingleton<AppConfig>(config)
-        ..registerSingleton<Clock>(const SystemClock())
-        ..registerSingleton<PriceStore>(
-          PriceStore(config, MutableClock(DateTime.utc(2026)),
-              ManualConflationScheduler()),
-        );
+        ..registerSingleton<Clock>(const SystemClock());
     }
   });
 
@@ -80,6 +76,14 @@ void main() {
             BlocProvider<AuthBloc>.value(value: auth),
             BlocProvider<WatchlistBloc>.value(value: watchlist),
             BlocProvider<FeedConnectionBloc>.value(value: feed),
+            BlocProvider<PriceBloc>(
+              create: (_) => PriceBloc(
+                config,
+                MutableClock(DateTime.utc(2026)),
+                ManualConflationScheduler(),
+                ManualPeriodicTicker(),
+              ),
+            ),
           ],
           child: const WatchlistView(),
         ),

@@ -5,13 +5,13 @@ import '../../app/di/injector.dart';
 import '../../app/theme/pulse_theme.dart';
 import '../../core/app_config.dart';
 import '../../core/clock.dart';
-import '../../data/feed/price_store.dart';
 import '../../data/instruments/models/instrument.dart';
 import '../blocs/auth/auth_bloc.dart';
 import '../blocs/auth/auth_event.dart';
 import '../blocs/feed/feed_connection_bloc.dart';
 import '../blocs/feed/feed_event.dart';
 import '../blocs/feed/feed_state.dart';
+import '../blocs/price/price_bloc.dart';
 import '../blocs/watchlist/watchlist_bloc.dart';
 import '../blocs/watchlist/watchlist_event.dart';
 import '../blocs/watchlist/watchlist_state.dart';
@@ -33,6 +33,9 @@ class WatchlistScreen extends StatelessWidget {
         BlocProvider<FeedConnectionBloc>(
           create: (_) => getIt<FeedConnectionBloc>()..add(const FeedEvent.started()),
         ),
+        // App-scoped singleton: the connection bloc writes into it through the
+        // TickSink port, and it outlives this screen.
+        BlocProvider<PriceBloc>.value(value: getIt<PriceBloc>()),
       ],
       child: const WatchlistView(),
     );
@@ -44,7 +47,6 @@ class WatchlistView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final PriceStore store = getIt<PriceStore>();
     final AppConfig config = getIt<AppConfig>();
 
     return MultiBlocListener(
@@ -93,7 +95,7 @@ class WatchlistView extends StatelessWidget {
         body: Column(
           children: <Widget>[
             ConnectionBanner(clock: getIt<Clock>()),
-            FeedDiagnostics(store: store),
+            const FeedDiagnostics(),
             const _ColumnHeaders(),
             Expanded(
               child: BlocBuilder<WatchlistBloc, WatchlistState>(
@@ -107,7 +109,6 @@ class WatchlistView extends StatelessWidget {
                     WatchlistLoaded(:final List<Instrument> instruments) =>
                       _InstrumentList(
                         instruments: instruments,
-                        store: store,
                         config: config,
                       ),
                   };
@@ -128,12 +129,10 @@ class WatchlistView extends StatelessWidget {
 class _InstrumentList extends StatelessWidget {
   const _InstrumentList({
     required this.instruments,
-    required this.store,
     required this.config,
   });
 
   final List<Instrument> instruments;
-  final PriceStore store;
   final AppConfig config;
 
   @override
@@ -146,7 +145,6 @@ class _InstrumentList extends StatelessWidget {
         return PriceRow(
           key: ValueKey<String>(instrument.symbol),
           instrument: instrument,
-          listenable: store.listenableFor(instrument.symbol),
           config: config,
           onTap: () => _openDetail(context, instrument),
         );
@@ -175,14 +173,17 @@ class _InstrumentList extends StatelessWidget {
 /// rather than looked up from a context that cannot see it.
 void _openDetail(BuildContext context, Instrument instrument) {
   final FeedConnectionBloc feed = context.read<FeedConnectionBloc>();
+  final PriceBloc prices = context.read<PriceBloc>();
 
   Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
-      builder: (_) => BlocProvider<FeedConnectionBloc>.value(
-        value: feed,
+      builder: (_) => MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<FeedConnectionBloc>.value(value: feed),
+          BlocProvider<PriceBloc>.value(value: prices),
+        ],
         child: InstrumentDetailScreen(
           instrument: instrument,
-          store: getIt<PriceStore>(),
           config: getIt<AppConfig>(),
           clock: getIt<Clock>(),
         ),
