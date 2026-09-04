@@ -171,6 +171,56 @@ The watchdog is a **single 1s periodic timer** comparing an injected clock
 against the last-activity timestamp - not a timer reset on every tick. At 60-90
 ticks/sec, resetting a timer per tick is pure allocation churn for no benefit.
 
+## 5b. App lifecycle
+
+Backgrounding was survivable before any of this existed, by accident of an
+earlier decision: the watchdog compares **wall-clock** time rather than
+resetting a timer per tick, so a suspended app is indistinguishable from a
+stalled feed and the existing recovery path just handles it. Two things were
+still wrong.
+
+**The resume window lied.** On foregrounding, the phase was still `live` until
+the watchdog's next 1s tick - a green banner above prices that could be minutes
+old. That is a direct hit on the one UI requirement the brief states in
+absolute terms. The fix is not on resume but on the way out: entering a
+`suspended` phase when the app is backgrounded means there is no frame on which
+the banner can claim live over pre-suspension data.
+
+**We kept streaming whenever the OS allowed it**, spending battery, data and
+the server's finite replay buffer on data nobody could see.
+
+So: `pause` tears the connection down and suppresses attempts exactly the way
+being offline does. `resume` resets backoff and reconnects immediately -
+returning is new information, not another failure.
+
+Only `pause` is wired, never `inactive`. The sequence out is
+resumed -> inactive -> hidden -> paused, and `inactive` alone fires for the app
+switcher, Control Centre, an incoming call, a permission dialog. Dropping the
+feed there would mean a reconnect every time someone glanced at their
+notifications. There is a test pinning that distinction because it is exactly
+the kind of thing that regresses quietly.
+
+Disconnect is immediate rather than after a grace period. Given the server drops
+every connection within 25-55s anyway, a reconnect is cheap; a short grace
+window would be kinder to someone flicking between apps, and is the obvious
+refinement if this were real.
+
+### A transport bug this uncovered
+
+Verifying with `lsof` rather than trusting the code showed the socket was
+**still ESTABLISHED** after teardown. Cancelling the response subscription
+stops us consuming, but `HttpClient` hands the socket back to its persistent
+connection pool - so the server carried on writing ticks into a connection
+nobody was reading, holding its own timers and buffer open.
+
+This affected *every* teardown, not just backgrounding: each stall-triggered
+reconnect left one behind. Connections are now marked non-persistent and the
+request is aborted on close. Measured afterwards: 1 socket -> 0 on background,
+holding 0, back to 1 within 3s of resume.
+
+The lesson worth stating: "we called close()" and "the socket is closed" are
+different claims, and only one of them can be checked.
+
 ## 6. Backoff and token expiry
 
 500ms base, doubling, capped at **15s**, with +/-20% jitter from an injected
@@ -245,7 +295,7 @@ it rather than hide it.
 
 ## 8. Tests: what I chose and why
 
-95 tests in the app plus 11 in the plugin. Chosen for risk, not coverage.
+104 tests in the app plus 11 in the plugin. Chosen for risk, not coverage.
 
 - **`sse_parser_test`** (20) - the field grammar, comments as first-class
   messages, id persistence across id-less events, one-byte-at-a-time chunk
@@ -270,7 +320,9 @@ it rather than hide it.
 - **`price_row_rebuild_test`** (4) - the performance contract end to end: 220
   ticks rebuild nothing above the price leaf. This is the guard rail for the
   whole design.
-- **`connection_banner_test`** (7) - each phase says something the user can act
+- **`app_lifecycle_bridge_test`** (3) - background drops the feed, resume
+  restores it, and a transient `inactive` does neither.
+- **`connection_banner_test`** (8) - each phase says something the user can act
   on. Catching the 4-second stalled window by screenshot is luck; asserting it
   is not.
 - **`watchlist_recovery_test`** (3) - the feed recovering also recovers the
@@ -334,6 +386,11 @@ doing both:
   p95 2.2ms across ~5500 frames including bursts. **Please run it in profile
   mode on a device**; the numbers above are indicative, not proof, and I would
   rather label them than present them as more than they are.
+- **Lifecycle was verified on the simulator, which does not truly suspend
+  apps.** The socket measurements above are real, and iOS delivered the full
+  `inactive -> hidden -> paused` sequence, but a physical device also freezes
+  timers and may kill the socket from underneath us. The wall-clock watchdog
+  covers that case by construction; I have not been able to observe it.
 - **The `--calm` flag is untested by me.** I built and verified against the
   chaotic default throughout.
 - **The stale badge is per-symbol and time-based**, so a genuinely illiquid
