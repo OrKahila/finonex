@@ -1,0 +1,313 @@
+# NOTES
+
+Pulse - a live market watchlist over a deliberately hostile SSE feed.
+
+---
+
+## 1. The central decision: two planes
+
+Everything else follows from this split.
+
+**Control plane** - `FeedConnectionBloc`. Is there a healthy stream? Should we
+reconnect, and when? Is the token about to die? Is the device online? These
+change a handful of times a minute, so emitting a bloc state per change is free.
+
+**Data plane** - `PriceStore`. Ticks arrive at ~50-60/sec at baseline and 220 in
+a single burst. They are dedup'd, ordered, conflated, and written into a
+per-symbol `ValueNotifier`. They never pass through bloc state.
+
+The brief says a full-list rebuild on every tick will not pass. Routing ticks
+through `emit()` *is* that full-list rebuild, so the two planes are not a
+stylistic preference - they are the requirement. A row's symbol and name build
+once; only the price pair listens; `RepaintBoundary` stops a flashing row
+repainting its neighbours.
+
+`test/presentation/widgets/price_row_rebuild_test.dart` pins this: 220 ticks
+rebuild *nothing* above the price leaf.
+
+The blocs still own all connection and lifecycle logic, which is what the
+architecture requirement is actually about. What they do not own is a
+60-times-a-second data firehose.
+
+## 2. Conflation: 16ms, and what it costs
+
+Accepted ticks land in a `Map<String, Tick>` (last write wins per symbol) and
+publish on a 16ms timer. A 220-tick burst across 5 hot symbols becomes **5
+notifier writes on the next flush** - the same cost as five ordinary ticks.
+
+**Why 16ms** rather than something slower: it is one frame at 60Hz. Anything
+slower is throwing away freshness for headroom we do not need once conflation
+has already collapsed the burst by ~40x. Anything faster does no work a frame
+can show. It is a single constant in `AppConfig`.
+
+**Why a timer rather than `addPostFrameCallback`**: post-frame callbacks only
+run if a frame was already scheduled. When the tree is otherwise idle nothing
+schedules one, so the first tick after a quiet moment would sit in the buffer
+indefinitely. `ConflationScheduler` is an interface, so tests flush on demand
+instead of waiting on real time.
+
+**What is lost**: intermediate prices within a 16ms window. For a watchlist
+this is not information - nobody can read a number that was on screen for 8ms.
+It *would* be information for a tape or a candle chart, and it is a real
+limitation of the sparkline on the detail screen: history is appended at flush
+time, so it samples post-conflation, not every tick. If the sparkline needed
+tick-accurate shape, history would have to be fed from `add()` instead - at the
+cost of a single burst flooding the ring buffer with 220 samples.
+
+## 3. Ordering, and something the brief does not mention
+
+Three ordered filters in `PriceStore.add`:
+
+1. **Duplicate suppression by SSE id** - a fixed-size ring of the last 2048 ids.
+   Catches the server's byte-identical replays. O(1), flat memory. The window is
+   sized against the server's own 1000-event replay buffer, so it comfortably
+   covers anything the server can legitimately re-send.
+2. **Ordering guard on `(ts, id)`** - drops anything not strictly newer.
+3. **Conflation** - as above.
+
+Filter 1 cannot catch the server's out-of-order event: `outOfOrder()` emits with
+`ts - 3000` but a **brand new, higher id**. Only a per-symbol timestamp guard
+sees it. Both layers are load-bearing, for different misbehaviours.
+
+**The thing I got wrong first.** I originally treated an equal timestamp as a
+replay and dropped it. Running against the real server showed
+`out-of-order: 397` in 90 seconds - far more than the documented chaos schedule
+can produce. The cause is `burst()`: it emits 220 ticks *synchronously*, so
+dozens of ticks for one symbol carry an identical millisecond `ts`. Dropping
+every tie pinned each hot row to the burst's *opening* price instead of its
+closing one - a silent correctness bug that no amount of staring at the spec
+would have surfaced.
+
+Timestamps are not a total order here. The SSE `id` is globally monotonic, so
+it breaks ties in true emission order: accept if `ts` is newer, or if `ts` is
+equal and the id moved forward. After the fix the same 90 seconds reports
+`out-of-order: 4`, which matches the chaos schedule. The counter became
+meaningful, which is the point of having it.
+
+## 4. What "no data loss" can and cannot mean
+
+The server buffers **1000 events**. At the ~50-60 ticks/sec I measured, that is
+roughly **15-20 seconds of history** - and a single burst consumes 220 of those
+1000 slots instantly, so during a burst the window is much shorter still.
+
+So:
+
+- An outage shorter than the buffer window: `Last-Event-ID` replays everything
+  we missed. Genuinely no loss.
+- An outage longer than that: the server sends one `event: gap` and continues
+  live. Those ticks are **gone permanently**. No client-side cleverness can
+  recover them; the data no longer exists anywhere.
+
+The honest response is to surface it, not paper over it. The banner shows a gap
+counter with a tooltip explaining what it means. A price feed that quietly
+implies continuity it does not have is worse than one that admits the hole.
+
+Worth being precise about a second limit: "no loss" here means *no loss the
+server can still serve*. Because we conflate, we also never render every tick -
+we render every *price*, which for a watchlist is the same thing and for a chart
+is not.
+
+**Known gap**: ids are monotonic, so a client can detect a hole itself by
+watching for id discontinuities, even when the server does not announce one.
+Pulse does not do this today. It would be my next addition - see §9.
+
+## 5. Stall detection: 8s and 12s
+
+The server's silent stall keeps the socket open and sends nothing - no ticks,
+**no heartbeats** - for exactly 25 seconds. Heartbeats arrive every 5s when
+healthy, which is what makes the stall detectable at all: silence past ~8s
+cannot be a quiet market, only a broken connection.
+
+- **8s of silence** -> `degraded`. The banner turns amber, names the silence in
+  seconds, says the prices are not current, and the list dims.
+- **12s of silence** -> tear the socket down and reconnect.
+
+We deliberately do not wait the stall out. Riding it would mean up to 25 seconds
+of frozen prices presented behind a connection that looks fine. Tearing down at
+12s costs one reconnect and gets live data back in well under a second.
+
+The watchdog is a **single 1s periodic timer** comparing an injected clock
+against the last-activity timestamp - not a timer reset on every tick. At 60-90
+ticks/sec, resetting a timer per tick is pure allocation churn for no benefit.
+
+## 6. Backoff and token expiry
+
+500ms base, doubling, capped at **15s**, with +/-20% jitter from an injected
+`Random`. The cap matters as much as the growth: "don't wait forever" argues
+against the 30-60s caps you often see.
+
+Two rules that stop the sequence being naively mechanical:
+
+**Healthy streams earn a clean slate.** A stream that ran 10s before dropping
+resets the attempt counter, so one long-lived connection dying does not inherit
+an old backoff step. This is also what makes stall recovery fast without any
+special-casing for stalls.
+
+**Expected drops cost nothing.** The server closes *every* connection the moment
+its token expires - a 1s timer per connection enforces it - so at a 60s TTL,
+every stream dies within a minute no matter what. A drop within 2s of the token
+expiry we already know about reconnects with **zero backoff**. Without this the
+app would visibly stutter once a minute, forever, for an entirely predictable
+event.
+
+Token handling:
+- Proactive refresh at 45s (15s before expiry), so the fresh token is already in
+  hand when the inevitable drop lands and the reconnect needs no login round-trip.
+- Reactive: a 401 refreshes once and retries immediately. A 401 on a *freshly
+  issued* token means the credentials themselves are bad - the only path that
+  ever puts a human back in front of a login form.
+- Refreshes are coalesced: the proactive timer and a 401 handler can fire
+  together, and two logins would race over which token wins.
+
+`AuthRepository` is deliberately timer-free. All scheduling lives in the feed
+bloc, so there is exactly one place where time-based behaviour has to be
+reasoned about - and one place to point `fakeAsync` at.
+
+## 7. The native piece (iOS)
+
+`packages/pulse_native` - hand-written channel code, no `flutter_secure_storage`,
+no `connectivity_plus`.
+
+- **MethodChannel** `pulse_native/secure_storage` -> Keychain
+  (`kSecClassGenericPassword`). Namespaced by bundle id so `deleteAll` cannot
+  reach other apps' secrets. Accessibility `kSecAttrAccessibleAfterFirstUnlock`
+  so the feed survives a locked screen. Writes are update-then-add, so a key is
+  never momentarily absent. `OSStatus` failures map to a stable Dart exception
+  code; a missing plugin registration is reported distinctly, because that is a
+  wiring bug rather than a storage failure.
+- **EventChannel** `pulse_native/reachability` -> `NWPathMonitor`. It fires its
+  handler immediately on start, so the first event a subscriber gets is the
+  current state, not the next change - no "unknown" gap at launch.
+
+Used in the reconnect logic: going offline tears the connection down and cancels
+pending backoff; while offline **zero** attempts are made; coming back online
+resets backoff and reconnects at once, because reachability returning is new
+information rather than another failure.
+
+**Second platform.** The Dart side uses the standard federated shape -
+`PulseNativePlatform` as an abstract class with a swappable static instance -
+so Android is one more subclass over `EncryptedSharedPreferences` +
+`ConnectivityManager`, selected in `_defaultInstance()`. Nothing above that line
+changes. Every non-iOS platform currently gets `InMemoryPulseNative`, a stub
+that keeps the app runnable and says out loud that it is not secure storage.
+
+**Security tradeoff, stated plainly.** The brief requires no user intervention
+after the initial login. Tokens live 60 seconds and there is no refresh-token
+endpoint, so a persisted *token* is essentially always dead by the next cold
+start. Meeting the requirement therefore means persisting the **credentials**,
+not just the token, and that is what Pulse does - username, password and token
+all in the Keychain. I would not ship this against a real broker. A real system
+would issue a long-lived refresh token, store only that, and gate its use behind
+biometric authentication. Given this server's API, storing credentials is the
+only way to satisfy the requirement; the right response is to be explicit about
+it rather than hide it.
+
+## 8. Tests: what I chose and why
+
+86 tests in the app plus 11 in the plugin. Chosen for risk, not coverage.
+
+- **`sse_parser_test`** (20) - the field grammar, comments as first-class
+  messages, id persistence across id-less events, one-byte-at-a-time chunk
+  boundaries, CRLF, a multi-byte character split across packets, and every
+  malformed shape the server produces.
+- **`feed_connection_bloc_test`** (20) - the whole state machine against a fake
+  transport and `fake_async`: the exact backoff sequence with a seeded RNG,
+  early-retry rejection, healthy-reset, degrade-then-teardown, heartbeats
+  holding a connection live, proactive refresh timing, 401-then-retry,
+  reachability gating (asserting *zero* transport calls while offline), and
+  resume ids. No real server, no real time.
+- **`price_store_test`** (18) - the three filters, tie-breaking by id, a whole
+  burst inside one millisecond, conflation collapse, and that stats update once
+  per flush rather than once per tick.
+- **`auth_repository_test`** (11) - the silent-restore path, corrupt stored
+  expiry, refresh coalescing.
+- **`reconnect_policy_test`** (4) - exact sequence, jitter bounds, jitter
+  actually varying, and no overflow on a very long outage.
+- **`price_row_rebuild_test`** (4) - the performance contract.
+- **`connection_banner_test`** (7) - each phase says something the user can act
+  on. Catching the 4-second stalled window by screenshot is luck; asserting it
+  is not.
+
+Two real bugs were found by tests rather than by me:
+- The flash controller ran `forward(from: 1)`, so the wash started fully faded
+  and **no flash was ever visible**.
+- An ordering bug in the bloc: teardown cleared the stream's open-time and token
+  expiry *before* the code that read them, so healthy-reset and expected-drop
+  detection both silently never fired.
+
+A third - the equal-timestamp bug in §3 - was found only by running against the
+real server, which is the honest argument for doing both.
+
+## 9. What I cut, and what I would do next
+
+**Cut deliberately:**
+- **Android implementation of the plugin.** The brief asks for one platform;
+  building two would have been effort spent proving something already agreed.
+  The Dart API is shaped for it and the stub keeps the app runnable.
+- **Search / sort / filter on the watchlist.** Not asked for, and it would have
+  complicated the list-identity story that the rebuild test depends on.
+- **Persisting prices across launches.** A watchlist that opens showing
+  yesterday's numbers is worse than one that opens empty for 200ms.
+- **A logging/telemetry layer.** The diagnostics row covers the same need for a
+  take-home and is visible during grading.
+
+**Next, in order:**
+1. **Client-side gap detection.** Ids are monotonic, so a jump of more than 1
+   means events were lost even when the server does not announce it. Today we
+   only count the gaps the server tells us about (§4).
+2. **Profile-mode frame measurement on a physical device.** See §10.
+3. **Android plugin implementation.**
+4. **A reconnect storm test** - many rapid connect/drop cycles asserting no
+   leaked subscriptions or overlapping sockets. The generation counter exists
+   precisely for this and deserves a test rather than an argument.
+5. **Tick-accurate history** for the sparkline, if the detail screen ever grew
+   into a real chart (§2).
+
+## 10. Known gaps and things I am aware of
+
+- **Frame timing is asserted structurally, not measured on real hardware.** The
+  rebuild test proves ticks do not propagate above the price leaf, which is the
+  mechanism the requirement is about. I could not complete a profile-mode
+  measurement: the simulator does not support profile mode, and the physical
+  device could not reach the feed server because this Mac's firewall blocks all
+  incoming connections under an MDM profile that cannot be changed. In debug
+  mode on the simulator - a strict upper bound, since debug builds are heavily
+  instrumented - build times were p50 1.7ms / p95 5.5ms and raster p50 0.9ms /
+  p95 2.2ms across ~5500 frames including bursts. **Please run it in profile
+  mode on a device**; the numbers above are indicative, not proof, and I would
+  rather label them than present them as more than they are.
+- **The `--calm` flag is untested by me.** I built and verified against the
+  chaotic default throughout.
+- **The stale badge is per-symbol and time-based**, so a genuinely illiquid
+  instrument (the `rate == 2` group ticks about once every 5s) can badge itself
+  stale during a normal quiet stretch. The threshold is 8s and tunable; a real
+  product would scale it per instrument's expected tick rate.
+- **`InMemoryPulseNative` reports "always online"**, so on a non-iOS platform
+  the reconnect logic loses its offline suppression. Documented in the package
+  README, and the login screen warns when secure storage is not native.
+- **No coverage of the widget tree above the row** beyond the banner - the
+  watchlist screen itself has no golden or integration test.
+- The connection banner rebuilds once a second while visible to run its
+  countdown. That is one small widget, deliberately, rather than a bloc emitting
+  a state per second.
+
+## 11. How I used AI tools
+
+I drove Claude Code (Opus) for essentially all of the typing, working from a
+plan we agreed up front: I answered ~30 scoping questions about architecture,
+thresholds, and tradeoffs before any code existed, and that plan is committed as
+`PLAN.md` so the decisions are auditable against what actually got built.
+
+Where it did the work: scaffolding, the Swift channel code, test bodies, and the
+mechanical parts of the widget tree. Where I made the calls: the control/data
+plane split, the conflation rate, the 8s/12s stall thresholds, ordering by
+`(ts, id)`, storing credentials rather than only the token, and what to cut.
+
+Two things are worth noting about the process, because they cut against the
+"AI wrote it" reading. First, the equal-timestamp bug (§3) was found by reading
+the *server's* source and then watching a counter misbehave against the live
+feed - not by generating more code. Second, several of the sharper decisions
+came from treating `feed_server.dart` as the specification rather than the
+prose: the 5s heartbeat, the 25s stall, the 1000-event buffer, the synchronous
+burst, and the per-connection token timer are all facts about the server that
+change the design, and none of them are in the brief.
