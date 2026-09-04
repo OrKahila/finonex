@@ -119,14 +119,27 @@ screen that did not recover when the feed did.
 
 ## Scope I left out
 
-- Android implementation of the native plugin. The brief asks for one platform;
-  I chose iOS and left a Dart API that can support Android later.
-- Search, sort and filtering. They were not needed for the task and would add
-  work unrelated to feed correctness.
-- Persisted prices. Showing an old quote after launch felt worse than showing a
-  placeholder until the live feed arrives.
-- A separate logging/telemetry system. The diagnostics row is enough to show
-  how the client is handling malformed, duplicate and out-of-order events.
+Things I would do next, roughly in the order I would do them.
+
+- No sanity check on tick timestamps. A tick dated far in the future would set
+  that symbol's ordering watermark to a value nothing can beat, and every later
+  tick would be silently rejected as stale. This server never does it, but the
+  guard is a couple of lines and the failure mode is permanent and invisible.
+- The instrument list is fetched once per session. It reloads if the feed
+  recovers from a failed load, but nothing refreshes it otherwise, so a symbol
+  added server-side never shows up until the app restarts.
+- Direction is carried by colour alone. There is no arrow on the price and no
+  semantic label, so a colour-blind user sees a flash with no direction and a
+  screen reader gets nothing useful out of the row.
+- No way to force a reconnect. Reachability covers the usual case, but if the
+  client is midway through a 15s backoff the user cannot say "try now". A tap
+  target on the banner would be enough.
+- Prices are formatted with toStringAsFixed, so US30 reads 40211.0 rather than
+  40,211.0. Locale-aware formatting would also fix the decimal separator.
+- Session high/low is really "since app launch", and I have labelled it as
+  session. A real client would anchor it to the trading session and persist it.
+- The diagnostics counters ship in the release build. They earn their place
+  while this is being reviewed; in a real app they belong behind a debug flag.
 
 ## Known limitations
 
