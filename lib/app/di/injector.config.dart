@@ -19,6 +19,13 @@ import 'package:pulse_native/pulse_native.dart' as _i1048;
 
 import '../../core/app_config.dart' as _i207;
 import '../../core/clock.dart' as _i215;
+import '../../data/auth/auth_api.dart' as _i812;
+import '../../data/auth/auth_repository.dart' as _i344;
+import '../../data/platform/pulse_native_network_monitor.dart' as _i110;
+import '../../data/platform/pulse_native_secure_store.dart' as _i882;
+import '../../domain/ports/network_monitor.dart' as _i231;
+import '../../domain/ports/secure_store.dart' as _i8;
+import '../../presentation/blocs/auth/auth_bloc.dart' as _i141;
 import 'register_module.dart' as _i291;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -35,6 +42,31 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i497.HttpClient>(() => registerModule.httpClient);
     gh.lazySingleton<_i1048.PulseNativePlatform>(
       () => registerModule.pulseNative,
+    );
+    gh.lazySingleton<_i8.SecureStore>(
+      () => _i882.PulseNativeSecureStore(gh<_i1048.PulseNativePlatform>()),
+    );
+    gh.lazySingleton<_i231.NetworkMonitor>(
+      () => _i110.PulseNativeNetworkMonitor(gh<_i1048.PulseNativePlatform>()),
+      dispose: (i) => i.dispose(),
+    );
+    gh.lazySingleton<_i812.AuthApi>(
+      () => _i812.AuthApi(
+        gh<_i497.HttpClient>(),
+        gh<_i207.AppConfig>(),
+        gh<_i215.Clock>(),
+      ),
+    );
+    gh.lazySingleton<_i344.AuthRepository>(
+      () => _i344.AuthRepository(
+        gh<_i812.AuthApi>(),
+        gh<_i8.SecureStore>(),
+        gh<_i215.Clock>(),
+        gh<_i207.AppConfig>(),
+      ),
+    );
+    gh.factory<_i141.AuthBloc>(
+      () => _i141.AuthBloc(gh<_i344.AuthRepository>()),
     );
     return this;
   }
