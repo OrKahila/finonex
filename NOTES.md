@@ -12,22 +12,59 @@ Everything else follows from this split.
 reconnect, and when? Is the token about to die? Is the device online? These
 change a handful of times a minute, so emitting a bloc state per change is free.
 
-**Data plane** - `PriceStore`. Ticks arrive at ~50-60/sec at baseline and 220 in
-a single burst. They are dedup'd, ordered, conflated, and written into a
-per-symbol `ValueNotifier`. They never pass through bloc state.
+**Data plane** - `PriceBloc`. Ticks arrive at ~50-60/sec at baseline and 220 in
+a single burst. They are dedup'd, ordered and conflated, and reach `emit` only
+once per ~16ms window - never one at a time.
 
-The brief says a full-list rebuild on every tick will not pass. Routing ticks
-through `emit()` *is* that full-list rebuild, so the two planes are not a
-stylistic preference - they are the requirement. A row's symbol and name build
-once; only the price pair listens; `RepaintBoundary` stops a flashing row
-repainting its neighbours.
+The brief says a full-list rebuild on every tick will not pass. Emitting per
+tick *is* that full-list rebuild, so the split is not a stylistic preference -
+it is the requirement. A row's symbol and name build once; only the price pair
+sits inside a `BlocSelector`; `RepaintBoundary` stops a flashing row repainting
+its neighbours.
+
+Two details carry that contract, and both are easy to break silently, so both
+are tested:
+
+- **`PriceState` equality is a revision counter, hand-written rather than
+  freezed.** Freezed generates `DeepCollectionEquality` for collection fields,
+  so bloc would deep-compare every quote on every emit purely to decide whether
+  to emit - O(symbols) of waste at frame cadence.
+- **The quote map is copy-on-write, and unchanged cells keep their identity.**
+  `BlocSelector` only skips a rebuild when the selected value is unchanged. If
+  a flush ever rebuilt every cell, every visible row would rebuild on every
+  flush and nothing would look wrong until DevTools was open.
 
 `test/presentation/widgets/price_row_rebuild_test.dart` pins this: 220 ticks
 rebuild *nothing* above the price leaf.
 
-The blocs still own all connection and lifecycle logic, which is what the
-architecture requirement is actually about. What they do not own is a
-60-times-a-second data firehose.
+### Why this is a bloc and not a store
+
+An earlier version of this used a `PriceStore` exposing a per-symbol
+`ValueNotifier` that widgets subscribed to directly. It performed identically -
+and I want to be precise about that, because it is the interesting part:
+
+At forty instruments the two designs are **indistinguishable**. `BlocSelector`
+does not call `setState` when the selected value is unchanged, so widget rebuild
+counts are the same. `ListView.builder` unmounts off-screen rows, so the
+selector fan-out is bounded by what is visible (~12), not by the instrument
+count. The residual cost of the bloc version - one new map per flush, one
+equality check per emit - is microseconds per second.
+
+`ValueNotifier` does scale better: notification is per-symbol by construction,
+so untouched symbols cost literally zero rather than a cheap comparison. That
+advantage would start to matter at several hundred symbols. It does not matter
+here.
+
+What decided it was ownership, not performance. With the store, the most
+frequently changing UI-facing state in the app was the one piece that did not
+live in a bloc, and widgets reached past the bloc layer to subscribe to a data
+object. That is a real deviation from the architecture the brief asks for, and
+"it is faster" was not a good enough reason for it when it measurably is not.
+
+The blocs now own the whole picture: connection lifecycle in one, market data
+in the other, with the correctness logic factored into `QuoteBook` - a pure,
+framework-free collaborator that decides what is *true* while the bloc decides
+how it is presented.
 
 ## 2. Conflation: 16ms, and what it costs
 
@@ -49,14 +86,18 @@ instead of waiting on real time.
 **What is lost**: intermediate prices within a 16ms window. For a watchlist
 this is not information - nobody can read a number that was on screen for 8ms.
 It *would* be information for a tape or a candle chart, and it is a real
-limitation of the sparkline on the detail screen: history is appended at flush
+limitation of the sparkline on the detail screen: history is appended at drain
 time, so it samples post-conflation, not every tick. If the sparkline needed
 tick-accurate shape, history would have to be fed from `add()` instead - at the
-cost of a single burst flooding the ring buffer with 220 samples.
+cost of a single burst flooding the ring buffer with 220 samples. There is a
+test asserting the current behaviour, so it stays a decision rather than drifting.
 
 ## 3. Ordering, and something the brief does not mention
 
-Three ordered filters in `PriceStore.add`:
+Three ordered filters:
+
+These live in `QuoteBook`, deliberately free of any notion of how updates reach
+the screen:
 
 1. **Duplicate suppression by SSE id** - a fixed-size ring of the last 2048 ids.
    Catches the server's byte-identical replays. O(1), flat memory. The window is
@@ -204,7 +245,7 @@ it rather than hide it.
 
 ## 8. Tests: what I chose and why
 
-89 tests in the app plus 11 in the plugin. Chosen for risk, not coverage.
+95 tests in the app plus 11 in the plugin. Chosen for risk, not coverage.
 
 - **`sse_parser_test`** (20) - the field grammar, comments as first-class
   messages, id persistence across id-less events, one-byte-at-a-time chunk
@@ -216,14 +257,19 @@ it rather than hide it.
   holding a connection live, proactive refresh timing, 401-then-retry,
   reachability gating (asserting *zero* transport calls while offline), and
   resume ids. No real server, no real time.
-- **`price_store_test`** (18) - the three filters, tie-breaking by id, a whole
-  burst inside one millisecond, conflation collapse, and that stats update once
-  per flush rather than once per tick.
+- **`quote_book_test`** (14) - the filters in isolation: tie-breaking by id, a
+  whole burst inside one millisecond, conflation collapse, dedup-window
+  eviction, session extremes surviving the ring buffer.
+- **`price_bloc_test`** (12) - that 220 ticks produce exactly *one* emission,
+  that untouched symbols keep the identical cell instance, that a counters-only
+  flush leaves every quote instance alone, and the flash semantics.
 - **`auth_repository_test`** (11) - the silent-restore path, corrupt stored
   expiry, refresh coalescing.
 - **`reconnect_policy_test`** (4) - exact sequence, jitter bounds, jitter
   actually varying, and no overflow on a very long outage.
-- **`price_row_rebuild_test`** (4) - the performance contract.
+- **`price_row_rebuild_test`** (4) - the performance contract end to end: 220
+  ticks rebuild nothing above the price leaf. This is the guard rail for the
+  whole design.
 - **`connection_banner_test`** (7) - each phase says something the user can act
   on. Catching the 4-second stalled window by screenshot is luck; asserting it
   is not.

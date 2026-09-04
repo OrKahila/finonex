@@ -63,7 +63,7 @@ Replace the IP with your Mac's (`ipconfig getifaddr en0`). Also required:
 flutter test && (cd packages/pulse_native && flutter test)
 ```
 
-89 tests in the app, 11 in the plugin. Connection-lifecycle logic is tested
+95 tests in the app, 11 in the plugin. Connection-lifecycle logic is tested
 against a fake transport and `fake_async` - no real server, no real time. See
 NOTES.md §8 for what is covered and why.
 
@@ -81,15 +81,16 @@ dart run build_runner build
 
 ```
 lib/
-  core/          AppConfig (every tunable), Clock, error types
-  domain/        ports (SecureStore, NetworkMonitor, TickSink), ReconnectPolicy
+  core/          AppConfig (every tunable), Clock, PeriodicTicker, error types
+  domain/        ports (SecureStore, NetworkMonitor, TickSink), models,
+                 ReconnectPolicy
   data/
     auth/        login, token lifecycle, Keychain persistence
-    feed/        SSE parser + transport, tick codec, PriceStore
+    feed/        SSE parser + transport, tick codec, QuoteBook
     instruments/ instrument list
     platform/    adapters onto the native plugin
   presentation/
-    blocs/       AuthBloc, FeedConnectionBloc, WatchlistBloc
+    blocs/       AuthBloc, FeedConnectionBloc, PriceBloc, WatchlistBloc
     screens/     login, watchlist, instrument detail
     widgets/     price row, connection banner, diagnostics, sparkline
 packages/
@@ -102,5 +103,7 @@ tool/
 
 - `lib/presentation/blocs/feed/feed_connection_bloc.dart` - the resilience state
   machine.
-- `lib/data/feed/price_store.dart` - dedup, ordering, conflation.
+- `lib/presentation/blocs/price/price_bloc.dart` - the data plane: conflation,
+  and the copy-on-write map that keeps `BlocSelector` cheap.
+- `lib/data/feed/quote_book.dart` - dedup and `(ts, id)` ordering, pure.
 - `lib/core/app_config.dart` - every threshold in one place, with the reasoning.
