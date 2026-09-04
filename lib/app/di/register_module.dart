@@ -13,8 +13,20 @@ import '../../domain/ports/tick_sink.dart';
 /// annotate directly.
 @module
 abstract class RegisterModule {
+  /// The feed server's address.
+  ///
+  /// Defaults to loopback, which is what the iOS Simulator needs (it shares
+  /// the host's network stack). A physical device has to be pointed at the
+  /// Mac's LAN address instead:
+  ///
+  ///   flutter run --dart-define=PULSE_BASE_URL=http://192.168.1.10:8080
   @lazySingleton
-  AppConfig get config => const AppConfig();
+  AppConfig get config => const AppConfig(
+        baseUrl: String.fromEnvironment(
+          'PULSE_BASE_URL',
+          defaultValue: 'http://127.0.0.1:8080',
+        ),
+      );
 
   @lazySingleton
   Clock get clock => const SystemClock();
