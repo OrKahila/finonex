@@ -46,6 +46,7 @@ class PulseNativeNetworkMonitor implements NetworkMonitor {
     yield* _controller.stream;
   }
 
+  @override
   @disposeMethod
   Future<void> dispose() async {
     await _subscription?.cancel();

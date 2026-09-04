@@ -206,6 +206,7 @@ class FakeNetworkMonitor implements NetworkMonitor {
         isExpensive: false,
       ));
 
+  @override
   Future<void> dispose() => _controller.close();
 }
 

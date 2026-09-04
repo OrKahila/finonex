@@ -4,7 +4,6 @@ analyzer:
   exclude:
     - "**/*.freezed.dart"
     - "**/*.g.dart"
-    - "**/*.config.dart"
     - "tool/**"
   errors:
     # freezed/json_serializable place annotations on synthesised parameters.

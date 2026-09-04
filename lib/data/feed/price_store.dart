@@ -42,8 +42,15 @@ class PriceStore implements TickSink {
   final Map<String, ValueNotifier<PriceCell>> _cells =
       <String, ValueNotifier<PriceCell>>{};
 
-  /// Last accepted timestamp per symbol. The ordering guard.
-  final Map<String, int> _lastTs = <String, int>{};
+  /// Last accepted (timestamp, event id) per symbol. The ordering guard.
+  ///
+  /// Timestamp alone is not a total order: the server's burst emits ~220 ticks
+  /// synchronously, so dozens of ticks for the same symbol share one
+  /// millisecond. Discarding those would pin the row to the burst's opening
+  /// price. The SSE id is globally monotonic, so it breaks ties in true
+  /// emission order.
+  final Map<String, ({int ts, int eventId})> _lastAccepted =
+      <String, ({int ts, int eventId})>{};
 
   /// Newest pending tick per symbol; last write wins within a window.
   final Map<String, Tick> _pending = <String, Tick>{};
@@ -79,16 +86,23 @@ class PriceStore implements TickSink {
       return;
     }
 
-    // 2. Ordering guard. `<=` rather than `<`: an identical timestamp carries
-    // no new information and would only risk a spurious flash.
-    final int? last = _lastTs[tick.symbol];
-    if (last != null && tick.ts <= last) {
+    // 2. Ordering guard, keyed on (ts, id).
+    //
+    // An older ts is stale and is dropped - that is the server's reordered
+    // event, which carries a *new* id and so sails past filter 1. An equal ts
+    // is only accepted if the id moved forward, which is what makes a burst
+    // land on its final price instead of its first.
+    final int eventId = id ?? 0;
+    final ({int ts, int eventId})? last = _lastAccepted[tick.symbol];
+    if (last != null &&
+        (tick.ts < last.ts ||
+            (tick.ts == last.ts && eventId <= last.eventId))) {
       _outOfOrder++;
       _statsDirty = true;
       _scheduler.schedule(_flush);
       return;
     }
-    _lastTs[tick.symbol] = tick.ts;
+    _lastAccepted[tick.symbol] = (ts: tick.ts, eventId: eventId);
 
     // 3. Conflate.
     _pending[tick.symbol] = tick;

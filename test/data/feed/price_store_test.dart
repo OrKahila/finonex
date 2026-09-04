@@ -44,14 +44,14 @@ void main() {
       expect(store.stats.value.accepted, 1);
     });
 
-    test('a duplicate cannot produce a second flash', () {
+    test('a re-delivered identical price cannot produce a second flash', () {
       store.add(tick(ts: 1000, id: 1, bid: 1.0));
       scheduler.flush();
-      store.add(tick(ts: 1000, id: 2, bid: 1.0));
+      // Passes both filters - new id, later ts - but the price did not move,
+      // so the revision the flash keys off must not budge.
+      store.add(tick(ts: 1001, id: 2, bid: 1.0));
       scheduler.flush();
 
-      // Same price re-delivered under a new id: the ordering guard drops it,
-      // and even if it had not, revision would not move.
       expect(cellOf('EURUSD').revision, 1);
     });
 
@@ -87,14 +87,37 @@ void main() {
       expect(store.stats.value.outOfOrder, 1);
     });
 
-    test('an identical timestamp is treated as a replay', () {
+    test('an identical timestamp is broken by event id, not discarded', () {
+      // The server's burst is synchronous: ~220 ticks land inside the same
+      // millisecond, so dozens of ticks per symbol share a ts. Dropping them
+      // would pin the row to the burst's opening price.
       store.add(tick(ts: 5000, id: 1, bid: 1.5));
       scheduler.flush();
       store.add(tick(ts: 5000, id: 2, bid: 7.7));
       scheduler.flush();
 
+      expect(cellOf('EURUSD').bid, 7.7);
+      expect(store.stats.value.outOfOrder, 0);
+    });
+
+    test('an identical timestamp with a lower id is stale', () {
+      store.add(tick(ts: 5000, id: 9, bid: 1.5));
+      scheduler.flush();
+      store.add(tick(ts: 5000, id: 4, bid: 7.7));
+      scheduler.flush();
+
       expect(cellOf('EURUSD').bid, 1.5);
       expect(store.stats.value.outOfOrder, 1);
+    });
+
+    test('a whole burst inside one millisecond lands on its final price', () {
+      for (int i = 1; i <= 55; i++) {
+        store.add(tick(ts: 5000, id: i, bid: i.toDouble()));
+      }
+      scheduler.flush();
+
+      expect(cellOf('EURUSD').bid, 55.0);
+      expect(store.stats.value.outOfOrder, 0);
     });
 
     test('a newer timestamp is accepted', () {

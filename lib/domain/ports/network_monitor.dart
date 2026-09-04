@@ -13,4 +13,8 @@ abstract class NetworkMonitor {
   /// Best known state right now. Starts as [NetworkStatus.assumedOnline] so we
   /// never refuse to connect just because the platform has not reported yet.
   NetworkStatus get current;
+
+  /// Releases the native subscription. Part of the port because an
+  /// implementation that holds an OS-level monitor has to be closable.
+  Future<void> dispose();
 }
