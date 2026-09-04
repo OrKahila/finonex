@@ -64,8 +64,8 @@ class HttpSseTransport implements SseTransport {
 }
 
 class _HttpSseConnection implements SseConnection {
-  _HttpSseConnection(this._request, this._response) {
-    _subscription = decodeSseStream(_response).listen(
+  _HttpSseConnection(this._request, HttpClientResponse response) {
+    _subscription = decodeSseStream(response).listen(
       _controller.add,
       onError: _controller.addError,
       onDone: () {
@@ -76,7 +76,6 @@ class _HttpSseConnection implements SseConnection {
   }
 
   final HttpClientRequest _request;
-  final HttpClientResponse _response;
   final StreamController<SseMessage> _controller =
       StreamController<SseMessage>();
 

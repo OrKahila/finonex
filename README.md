@@ -63,9 +63,8 @@ Replace the IP with your Mac's (`ipconfig getifaddr en0`). Also required:
 flutter test && (cd packages/pulse_native && flutter test)
 ```
 
-104 tests in the app, 11 in the plugin. Connection-lifecycle logic is tested
-against a fake transport and `fake_async` - no real server, no real time. See
-NOTES.md §8 for what is covered and why.
+Connection-lifecycle logic is tested against a fake transport and `fake_async`
+- no real server, no real time. See NOTES.md for which tests I chose and why.
 
 ## Regenerating code
 
